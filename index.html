@@ -179,7 +179,7 @@ const DEFAULT_VEHICLES = [
     id: 'subaru-used',
     name: 'Used Subaru AWD',
     short: 'Subaru',
-    tagline: 'Family loan · no interest, 60 mo',
+    tagline: 'Used · 0% APR · $0 down · 60 mo',
     price: 20000, apr: 0, loanMonths: 60,
     type: 'gas', mpg: 26,
     insurance: 130, maintenance: 180,
@@ -558,7 +558,7 @@ function InputsPanel({ globals, setGlobals }) {
           <Slider label="Down payment (Teslas)"
                   value={globals.downPayment} onChange={(v) => setGlobals({...globals, downPayment: v})}
                   min={0} max={30000} step={500} format={(v) => fmtUSD(v)}
-                  hint="Subaru is family loan with $0 down" />
+                  hint="Subaru is modeled with $0 down" />
         </div>
       </div>
     </Section>
