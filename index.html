@@ -1,0 +1,1271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>The Vehicle Decision · A calm look at the numbers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          display: ['Fraunces', 'ui-serif', 'Georgia', 'serif'],
+          sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+          mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+        },
+        colors: {
+          paper: '#FBF8F3',
+          ink: '#1B1A17',
+        },
+      },
+    },
+  };
+</script>
+<style>
+  html, body { background: #FBF8F3; color: #1B1A17; }
+  body { font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  .display { font-family: 'Fraunces', Georgia, serif; font-variation-settings: "opsz" 96; letter-spacing: -0.015em; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .grid-bg {
+    background-image:
+      linear-gradient(rgba(27,26,23,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(27,26,23,0.04) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  input[type="range"] { -webkit-appearance: none; appearance: none; height: 4px; background: #E7E2D6; border-radius: 999px; outline: none; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 999px; background: #1B1A17; cursor: pointer; border: 3px solid #FBF8F3; box-shadow: 0 0 0 1px #1B1A17; }
+  input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 999px; background: #1B1A17; cursor: pointer; border: 3px solid #FBF8F3; box-shadow: 0 0 0 1px #1B1A17; }
+  .fade-in { animation: fadeIn 0.4s ease-out; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  .ring-soft { box-shadow: 0 1px 0 rgba(27,26,23,0.04), 0 0 0 1px rgba(27,26,23,0.08); }
+  .ring-soft-strong { box-shadow: 0 1px 0 rgba(27,26,23,0.04), 0 0 0 1px rgba(27,26,23,0.18); }
+  details > summary { list-style: none; cursor: pointer; }
+  details > summary::-webkit-details-marker { display: none; }
+  .number-tabular { font-variant-numeric: tabular-nums; }
+  @media print {
+    .no-print { display: none !important; }
+    body { background: white; }
+  }
+</style>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/prop-types@15/prop-types.min.js"></script>
+<script crossorigin src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useMemo, useEffect, useRef, useCallback } = React;
+const {
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, ResponsiveContainer, ReferenceLine, Area, AreaChart,
+  ComposedChart, Cell,
+} = Recharts;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FINANCIAL ENGINE
+// ─────────────────────────────────────────────────────────────────────────────
+
+function monthlyLoanPayment(price, downPayment, aprPercent, months) {
+  const principal = Math.max(0, price - downPayment);
+  if (principal === 0 || months <= 0) return 0;
+  const r = aprPercent / 100 / 12;
+  if (r === 0) return principal / months;
+  return (principal * r) / (1 - Math.pow(1 + r, -months));
+}
+
+function totalInterest(price, downPayment, aprPercent, months) {
+  const payment = monthlyLoanPayment(price, downPayment, aprPercent, months);
+  const principal = Math.max(0, price - downPayment);
+  return Math.max(0, payment * months - principal);
+}
+
+function fuelMonthly(vehicle, monthlyMiles, gasPrice, electricityRate) {
+  if (vehicle.type === 'EV') {
+    return (monthlyMiles / vehicle.milesPerKwh) * electricityRate;
+  }
+  return (monthlyMiles / vehicle.mpg) * gasPrice;
+}
+
+function effectiveDownPayment(vehicle, globalDownPayment) {
+  if (vehicle.fixedDownPayment !== undefined) return vehicle.fixedDownPayment;
+  // Can't put more down than the car costs
+  return Math.min(globalDownPayment, vehicle.price);
+}
+
+function computeMonthly(vehicle, g) {
+  const down = effectiveDownPayment(vehicle, g.downPayment);
+  const payment = monthlyLoanPayment(vehicle.price, down, vehicle.apr, vehicle.loanMonths);
+  const fuel = fuelMonthly(vehicle, g.monthlyMiles, g.gasPrice, g.electricityRate);
+  const insurance = vehicle.insurance;
+  const maintenance = vehicle.maintenance;
+  return {
+    payment,
+    fuel,
+    insurance,
+    maintenance,
+    total: payment + fuel + insurance + maintenance,
+    downPayment: down,
+  };
+}
+
+function cumulativeSeries(vehicle, g, horizonMonths = 60) {
+  const m = computeMonthly(vehicle, g);
+  const series = [];
+  let cum = m.downPayment;
+  series.push({ month: 0, total: cum });
+  for (let i = 1; i <= horizonMonths; i++) {
+    const monthPayment = i <= vehicle.loanMonths ? m.payment : 0;
+    cum += monthPayment + m.fuel + m.insurance + m.maintenance;
+    series.push({ month: i, total: cum });
+  }
+  return series;
+}
+
+function totalAtMonth(vehicle, g, atMonth) {
+  const m = computeMonthly(vehicle, g);
+  const paymentMonths = Math.min(atMonth, vehicle.loanMonths);
+  return m.downPayment + paymentMonths * m.payment + atMonth * (m.fuel + m.insurance + m.maintenance);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DEFAULTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DEFAULT_GLOBALS = {
+  annualMiles: 30000,
+  monthlyMiles: 2500,
+  gasPrice: 3.25,
+  electricityRate: 0.14,
+  downPayment: 20000,
+  currentGasSpend: 600,
+  currentMaintenanceSpend: 150,
+};
+
+const DEFAULT_VEHICLES = [
+  {
+    id: 'tesla-new-regular',
+    name: 'Tesla Model Y AWD',
+    short: 'Model Y',
+    tagline: 'New · 0% APR · full warranty',
+    price: 40000,
+    apr: 0,
+    loanMonths: 60,
+    type: 'EV',
+    milesPerKwh: 3.6,
+    insurance: 190,
+    maintenance: 55,
+    accent: 'emerald',
+    turoAnnual: 12963,
+    turoDaily: 86,
+    risks: ['Insurance can run high on new Teslas — verify your quote'],
+    strengths: [
+      '0% APR — every dollar of payment is principal',
+      'Full 4yr / 50k bumper warranty + 8yr / 120k battery',
+      'No mystery history, no degraded battery',
+      'Lowest fuel cost per mile at 30k mi/yr',
+    ],
+  },
+  {
+    id: 'tesla-new-premium',
+    name: 'Tesla Model Y Premium AWD',
+    short: 'Premium',
+    tagline: 'New · 0.99% APR · upgraded interior',
+    price: 50000,
+    apr: 0.99,
+    loanMonths: 60,
+    type: 'EV',
+    milesPerKwh: 3.5,
+    insurance: 210,
+    maintenance: 60,
+    accent: 'sky',
+    turoAnnual: 13500,
+    turoDaily: 90,
+    risks: [
+      '$10k more car for marginally nicer interior',
+      'Same fuel savings as regular AWD',
+    ],
+    strengths: [
+      'Same EV fuel economics as regular Y',
+      'Premium audio + materials if that matters to you',
+      'Still excellent APR',
+    ],
+  },
+  {
+    id: 'subaru-used',
+    name: 'Used Subaru AWD',
+    short: 'Subaru',
+    tagline: 'Family loan · no interest',
+    price: 20000,
+    apr: 0,
+    loanMonths: 60,
+    type: 'gas',
+    mpg: 26,
+    insurance: 130,
+    maintenance: 180,
+    accent: 'amber',
+    fixedDownPayment: 0,
+    repaymentLabel: 'family loan',
+    turoAnnual: 11236,
+    turoDaily: 75,
+    risks: [
+      'Burns $7,000+/yr in gas at 30k mi/yr',
+      'Maintenance creeps as miles pile up — brakes, tires, fluids',
+      'Resale value drops faster than EV at very high mileage',
+      'You\'re still buying gasoline every week of every year',
+    ],
+    strengths: [
+      'Lowest cash out the door',
+      'No interest — full amount goes to principal',
+      'Known quantity, familiar mechanics',
+      'No charging logistics',
+    ],
+  },
+  {
+    id: 'tesla-used',
+    name: 'Used Tesla Model Y (2023)',
+    short: 'Used Y',
+    tagline: 'Used · ~8.5% APR · warranty risk',
+    price: 30000,
+    apr: 8.5,
+    loanMonths: 72,
+    type: 'EV',
+    milesPerKwh: 3.5,
+    insurance: 190,
+    maintenance: 70,
+    accent: 'stone',
+    startingMiles: 40000,
+    batteryWarrantyMiles: 100000,
+    turoAnnual: 11500,
+    turoDaily: 80,
+    risks: [
+      'Warranty has ~60k miles left — at 30k/yr that\'s 2 years',
+      'Unknown charging history affects battery health',
+      'Used Tesla loans run 8–10% APR — interest eats the discount',
+      'Only ~$10k cheaper than new but with real risk attached',
+    ],
+    strengths: [
+      'Lower sticker price',
+      'Still gets full EV fuel savings',
+      'Same software / Supercharger access',
+    ],
+  },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FORMATTING HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+const fmtUSD = (n, digits = 0) =>
+  new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: digits,
+    minimumFractionDigits: digits,
+  }).format(Math.round(n * Math.pow(10, digits)) / Math.pow(10, digits));
+
+const fmtUSDcompact = (n) => {
+  if (Math.abs(n) >= 1000) return '$' + (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+  return fmtUSD(n);
+};
+
+const ACCENT = {
+  emerald: { text: 'text-emerald-700', bg: 'bg-emerald-50', ring: 'ring-emerald-200', dot: 'bg-emerald-600', stroke: '#047857' },
+  sky:     { text: 'text-sky-700',     bg: 'bg-sky-50',     ring: 'ring-sky-200',     dot: 'bg-sky-600',     stroke: '#0369a1' },
+  amber:   { text: 'text-amber-700',   bg: 'bg-amber-50',   ring: 'ring-amber-200',   dot: 'bg-amber-600',   stroke: '#b45309' },
+  stone:   { text: 'text-stone-700',   bg: 'bg-stone-100',  ring: 'ring-stone-300',   dot: 'bg-stone-600',   stroke: '#57534e' },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UI PRIMITIVES
+// ─────────────────────────────────────────────────────────────────────────────
+
+function Section({ id, eyebrow, title, subtitle, children, className = '' }) {
+  return (
+    <section id={id} className={`max-w-6xl mx-auto px-6 sm:px-10 ${className}`}>
+      {(eyebrow || title) && (
+        <div className="mb-8 sm:mb-12">
+          {eyebrow && (
+            <div className="mono text-xs tracking-[0.2em] uppercase text-stone-500 mb-3">
+              {eyebrow}
+            </div>
+          )}
+          {title && (
+            <h2 className="display text-3xl sm:text-4xl font-medium text-ink leading-tight max-w-3xl">
+              {title}
+            </h2>
+          )}
+          {subtitle && (
+            <p className="mt-3 text-stone-600 max-w-2xl text-base sm:text-lg leading-relaxed">
+              {subtitle}
+            </p>
+          )}
+        </div>
+      )}
+      {children}
+    </section>
+  );
+}
+
+function Stat({ label, value, sub, accent = 'stone', large = false }) {
+  const a = ACCENT[accent];
+  return (
+    <div>
+      <div className="mono text-[10px] tracking-[0.18em] uppercase text-stone-500 mb-1.5">{label}</div>
+      <div className={`display ${large ? 'text-4xl sm:text-5xl' : 'text-2xl sm:text-3xl'} font-medium number-tabular ${a.text}`}>
+        {value}
+      </div>
+      {sub && <div className="mt-1 text-sm text-stone-500">{sub}</div>}
+    </div>
+  );
+}
+
+function Pill({ children, accent = 'stone' }) {
+  const a = ACCENT[accent];
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${a.bg} ${a.text}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${a.dot}`} />
+      {children}
+    </span>
+  );
+}
+
+function Slider({ label, value, onChange, min, max, step, format, hint }) {
+  return (
+    <label className="block">
+      <div className="flex items-baseline justify-between mb-2">
+        <span className="text-sm text-stone-700">{label}</span>
+        <span className="mono text-sm text-ink number-tabular">{format ? format(value) : value}</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        className="w-full"
+      />
+      {hint && <div className="text-xs text-stone-500 mt-1.5">{hint}</div>}
+    </label>
+  );
+}
+
+function NumberInput({ label, value, onChange, prefix, suffix, step = 1, hint }) {
+  return (
+    <label className="block">
+      <div className="text-sm text-stone-700 mb-1.5">{label}</div>
+      <div className="flex items-center bg-paper ring-soft rounded-lg overflow-hidden focus-within:ring-soft-strong">
+        {prefix && <span className="px-3 text-stone-500 text-sm">{prefix}</span>}
+        <input
+          type="number"
+          value={value}
+          step={step}
+          onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+          className="flex-1 bg-transparent py-2 px-2 outline-none mono text-sm number-tabular"
+        />
+        {suffix && <span className="px-3 text-stone-500 text-sm">{suffix}</span>}
+      </div>
+      {hint && <div className="text-xs text-stone-500 mt-1.5">{hint}</div>}
+    </label>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HEADER
+// ─────────────────────────────────────────────────────────────────────────────
+
+function Header({ winner, currentMonthlySpend }) {
+  return (
+    <header className="border-b border-stone-200/70">
+      <div className="max-w-6xl mx-auto px-6 sm:px-10 py-5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-ink flex items-center justify-center">
+            <span className="display text-paper text-lg leading-none -mt-0.5">v</span>
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-ink leading-tight">The Vehicle Decision</div>
+            <div className="text-xs text-stone-500 leading-tight">A calm look at the numbers</div>
+          </div>
+        </div>
+        <div className="hidden sm:flex items-center gap-6 text-sm text-stone-600">
+          <a href="#verdict" className="hover:text-ink transition-colors">Verdict</a>
+          <a href="#cards" className="hover:text-ink transition-colors">Vehicles</a>
+          <a href="#charts" className="hover:text-ink transition-colors">Numbers</a>
+          <a href="#assumptions" className="hover:text-ink transition-colors">Assumptions</a>
+          <a href="#summary" className="hover:text-ink transition-colors">Summary</a>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HERO + VERDICT
+// ─────────────────────────────────────────────────────────────────────────────
+
+function Hero() {
+  return (
+    <Section className="pt-16 sm:pt-24 pb-10">
+      <div className="mono text-xs tracking-[0.2em] uppercase text-stone-500 mb-5">
+        Four vehicles · five years · 30,000 miles a year
+      </div>
+      <h1 className="display text-4xl sm:text-6xl font-medium text-ink leading-[1.05] max-w-4xl">
+        A look at the numbers.<br />
+        <span className="text-stone-400">All four options, side by side.</span>
+      </h1>
+      <p className="mt-6 text-lg text-stone-600 max-w-2xl leading-relaxed">
+        At 30,000 miles a year, fuel becomes the largest line item in the comparison. Below:
+        monthly all-in cost, five-year totals, optional Turo income, and every assumption
+        the math depends on — adjustable, so the numbers reflect your real situation.
+      </p>
+    </Section>
+  );
+}
+
+function Verdict({ vehicles, globals, winnerId, runnerId, currentMonthly }) {
+  const winner = vehicles.find((v) => v.id === winnerId);
+  const runner = vehicles.find((v) => v.id === runnerId);
+  const wm = computeMonthly(winner, globals);
+  const wTotal5 = totalAtMonth(winner, globals, 60);
+  const rm = runner ? computeMonthly(runner, globals) : null;
+  const rTotal5 = runner ? totalAtMonth(runner, globals, 60) : null;
+  const monthlyDelta = wm.total - currentMonthly;
+  const a = ACCENT[winner.accent];
+
+  return (
+    <Section id="verdict" className="pb-16">
+      <div className={`rounded-3xl ${a.bg} ring-1 ${a.ring} p-8 sm:p-12 fade-in`}>
+        <div className="flex items-center gap-2 mb-6">
+          <Pill accent={winner.accent}>The math points here</Pill>
+          <span className="text-xs text-stone-500">live · updates with your assumptions</span>
+        </div>
+        <div className="grid md:grid-cols-5 gap-8 items-start">
+          <div className="md:col-span-3">
+            <div className="mono text-xs tracking-[0.2em] uppercase text-stone-500 mb-2">Best overall</div>
+            <h2 className="display text-4xl sm:text-5xl font-medium text-ink leading-tight">
+              {winner.name}
+            </h2>
+            <p className="mt-3 text-stone-600 text-base sm:text-lg leading-relaxed max-w-xl">
+              {winner.id === 'tesla-new-regular' && 'Lowest 5-year total at the inputs shown. 0% APR, full warranty, and electricity replaces gasoline for 30,000 miles a year.'}
+              {winner.id === 'tesla-new-premium' && 'Same EV operating cost as the standard Y; the $10k premium goes to interior and audio, not to the math.'}
+              {winner.id === 'subaru-used' && 'Lowest sticker and lowest monthly payment. Sensitive to mileage and gas price — the Tesla lines pass it once annual miles exceed roughly 18,000.'}
+              {winner.id === 'tesla-used' && '$10k cheaper than new but APR is higher and the 100k-mile battery warranty has limited runway at 30,000 miles a year.'}
+            </p>
+          </div>
+          <div className="md:col-span-2 grid grid-cols-2 gap-6">
+            <Stat label="Monthly all-in" value={fmtUSD(wm.total)} sub="payment + fuel + ins + maint" accent={winner.accent} large />
+            <Stat label="5-year total" value={fmtUSDcompact(wTotal5)} sub="including down payment" accent={winner.accent} large />
+            <Stat
+              label="vs. current spend"
+              value={(monthlyDelta < 0 ? '−' : '+') + fmtUSD(Math.abs(monthlyDelta))}
+              sub="per month"
+              accent={monthlyDelta < 0 ? 'emerald' : 'amber'}
+            />
+            {runner && (
+              <Stat
+                label="vs. runner-up"
+                value={fmtUSDcompact(rTotal5 - wTotal5)}
+                sub={`saves over ${runner.short}, 5yr`}
+                accent="emerald"
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SITUATION STRIP
+// ─────────────────────────────────────────────────────────────────────────────
+
+function SituationStrip({ globals }) {
+  const annualGas = globals.currentGasSpend * 12;
+  const annualMaint = globals.currentMaintenanceSpend * 12;
+  return (
+    <Section className="pb-16">
+      <div className="rounded-2xl bg-white ring-soft p-6 sm:p-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-10">
+          <div>
+            <div className="mono text-[10px] tracking-[0.18em] uppercase text-stone-500 mb-1.5">Daily driving</div>
+            <div className="display text-2xl font-medium">~3 hours</div>
+            <div className="text-sm text-stone-500 mt-1">city traffic, commuting</div>
+          </div>
+          <div>
+            <div className="mono text-[10px] tracking-[0.18em] uppercase text-stone-500 mb-1.5">Annual miles</div>
+            <div className="display text-2xl font-medium number-tabular">{globals.annualMiles.toLocaleString()}</div>
+            <div className="text-sm text-stone-500 mt-1">~2× the US average</div>
+          </div>
+          <div>
+            <div className="mono text-[10px] tracking-[0.18em] uppercase text-stone-500 mb-1.5">Gas spend (now)</div>
+            <div className="display text-2xl font-medium number-tabular">{fmtUSD(globals.currentGasSpend)}/mo</div>
+            <div className="text-sm text-stone-500 mt-1">{fmtUSD(annualGas)}/yr at the pump</div>
+          </div>
+          <div>
+            <div className="mono text-[10px] tracking-[0.18em] uppercase text-stone-500 mb-1.5">Maintenance (now)</div>
+            <div className="display text-2xl font-medium number-tabular">{fmtUSD(globals.currentMaintenanceSpend)}/mo</div>
+            <div className="text-sm text-stone-500 mt-1">{fmtUSD(annualMaint)}/yr on the current car</div>
+          </div>
+        </div>
+        <div className="mt-6 pt-6 border-t border-stone-200/70 text-sm text-stone-600 leading-relaxed">
+          <span className="text-ink font-medium">Per-mile fuel cost:</span>{' '}
+          gasoline at 26 mpg costs {fmtUSD(globals.gasPrice / 26, 2)}/mile.
+          Electricity at 3.6 mi/kWh costs {fmtUSD(globals.electricityRate / 3.6, 2)}/mile.
+          The difference, {fmtUSD((globals.gasPrice/26) - (globals.electricityRate/3.6), 2)}/mile,
+          times {globals.annualMiles.toLocaleString()} miles equals {fmtUSD(((globals.gasPrice/26) - (globals.electricityRate/3.6)) * globals.annualMiles)} a year.
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VEHICLE CARDS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function VehicleCard({ vehicle, globals, isWinner }) {
+  const a = ACCENT[vehicle.accent];
+  const m = computeMonthly(vehicle, globals);
+  const fiveYear = totalAtMonth(vehicle, globals, 60);
+  const interest = totalInterest(vehicle.price, m.downPayment, vehicle.apr, vehicle.loanMonths);
+  return (
+    <div className={`relative rounded-2xl bg-white ring-soft p-6 sm:p-7 transition-all ${isWinner ? 'ring-2 ' + a.ring : ''}`}>
+      {isWinner && (
+        <div className="absolute -top-3 left-6">
+          <Pill accent={vehicle.accent}>Best overall</Pill>
+        </div>
+      )}
+      <div className="flex items-start justify-between gap-3 mb-1">
+        <div>
+          <h3 className="display text-2xl font-medium leading-tight">{vehicle.name}</h3>
+          <div className="text-sm text-stone-500 mt-0.5">{vehicle.tagline}</div>
+        </div>
+        <div className={`mono text-xs ${a.text}`}>{vehicle.type === 'EV' ? 'EV' : 'GAS'}</div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-2 gap-4">
+        <Stat label="Monthly all-in" value={fmtUSD(m.total)} accent={vehicle.accent} />
+        <Stat label="5-year total" value={fmtUSDcompact(fiveYear)} accent={vehicle.accent} />
+      </div>
+
+      <div className="mt-6 space-y-1.5 text-sm">
+        <Row label="Payment" value={fmtUSD(m.payment)} sub={vehicle.repaymentLabel || `${vehicle.loanMonths}mo @ ${vehicle.apr}% APR`} />
+        <Row label={vehicle.type === 'EV' ? 'Electricity' : 'Gasoline'} value={fmtUSD(m.fuel)} sub={`${globals.monthlyMiles.toLocaleString()} mi @ ${vehicle.type === 'EV' ? vehicle.milesPerKwh + ' mi/kWh' : vehicle.mpg + ' mpg'}`} />
+        <Row label="Insurance" value={fmtUSD(m.insurance)} sub="placeholder · editable" />
+        <Row label="Maintenance" value={fmtUSD(m.maintenance)} sub={vehicle.type === 'EV' ? 'tires, wipers, cabin filter' : 'oil, brakes, tires, fluids'} />
+        <Row label="Down payment" value={fmtUSD(m.downPayment)} sub={vehicle.fixedDownPayment !== undefined ? 'fixed (family loan)' : 'from your slider'} muted />
+        {interest > 0 && (
+          <Row label="Interest (loan total)" value={fmtUSD(interest)} sub="paid over loan life" muted />
+        )}
+      </div>
+
+      <details className="mt-5 group">
+        <summary className="flex items-center justify-between text-sm text-stone-700 hover:text-ink select-none">
+          <span>What could go right or wrong</span>
+          <span className="mono text-xs text-stone-400 group-open:rotate-180 inline-block transition-transform">▾</span>
+        </summary>
+        <div className="mt-4 space-y-3">
+          <div>
+            <div className="mono text-[10px] tracking-[0.18em] uppercase text-emerald-700 mb-1.5">Strengths</div>
+            <ul className="space-y-1.5">
+              {vehicle.strengths.map((s, i) => (
+                <li key={i} className="text-sm text-stone-700 flex gap-2">
+                  <span className="text-emerald-600 mt-0.5">+</span>
+                  <span>{s}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <div className="mono text-[10px] tracking-[0.18em] uppercase text-amber-700 mb-1.5">Risks</div>
+            <ul className="space-y-1.5">
+              {vehicle.risks.map((r, i) => (
+                <li key={i} className="text-sm text-stone-700 flex gap-2">
+                  <span className="text-amber-600 mt-0.5">−</span>
+                  <span>{r}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function Row({ label, value, sub, muted = false }) {
+  return (
+    <div className={`flex items-baseline justify-between py-1 border-b border-stone-100 last:border-0 ${muted ? 'opacity-60' : ''}`}>
+      <div>
+        <div className="text-stone-700">{label}</div>
+        {sub && <div className="text-xs text-stone-400 leading-tight">{sub}</div>}
+      </div>
+      <div className="mono text-sm text-ink number-tabular">{value}</div>
+    </div>
+  );
+}
+
+function VehicleCards({ vehicles, globals, winnerId }) {
+  return (
+    <Section id="cards" eyebrow="The four options" title="Each option, all-in." subtitle="Monthly all-in includes loan payment, fuel or electricity, insurance, and maintenance. The 5-year total includes your down payment.">
+      <div className="grid sm:grid-cols-2 gap-5 sm:gap-6">
+        {vehicles.map((v) => (
+          <VehicleCard key={v.id} vehicle={v} globals={globals} isWinner={v.id === winnerId} />
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CHARTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function CumulativeChart({ vehicles, globals }) {
+  const horizon = 60;
+  const data = useMemo(() => {
+    const series = vehicles.map((v) => ({ v, s: cumulativeSeries(v, globals, horizon) }));
+    const rows = [];
+    for (let i = 0; i <= horizon; i++) {
+      const row = { month: i };
+      series.forEach(({ v, s }) => { row[v.id] = Math.round(s[i].total); });
+      rows.push(row);
+    }
+    return rows;
+  }, [vehicles, globals]);
+
+  // find break-even between Subaru and the new Model Y regular
+  const breakEven = useMemo(() => {
+    const a = vehicles.find((v) => v.id === 'subaru-used');
+    const b = vehicles.find((v) => v.id === 'tesla-new-regular');
+    if (!a || !b) return null;
+    for (let i = 0; i <= horizon; i++) {
+      const at = totalAtMonth(a, globals, i);
+      const bt = totalAtMonth(b, globals, i);
+      if (bt < at && i > 0) return i;
+    }
+    return null;
+  }, [vehicles, globals]);
+
+  return (
+    <div className="rounded-2xl bg-white ring-soft p-6 sm:p-8">
+      <div className="flex items-baseline justify-between gap-4 flex-wrap mb-2">
+        <div>
+          <h3 className="display text-2xl font-medium">Cumulative cash out · 5 years</h3>
+          <p className="text-sm text-stone-500 mt-1">Every dollar you'll have spent on the car, by month. Lower line wins.</p>
+        </div>
+        {breakEven && (
+          <Pill accent="emerald">Model Y passes Subaru at month {breakEven}</Pill>
+        )}
+      </div>
+      <div className="h-80 sm:h-96 mt-4">
+        <ResponsiveContainer>
+          <LineChart data={data} margin={{ top: 10, right: 24, left: 0, bottom: 0 }}>
+            <CartesianGrid stroke="#E7E2D6" strokeDasharray="2 4" vertical={false} />
+            <XAxis
+              dataKey="month"
+              tick={{ fill: '#78716c', fontSize: 11 }}
+              tickLine={false}
+              axisLine={{ stroke: '#E7E2D6' }}
+              ticks={[0, 12, 24, 36, 48, 60]}
+              tickFormatter={(m) => m === 0 ? 'now' : `yr ${m/12}`}
+            />
+            <YAxis
+              tick={{ fill: '#78716c', fontSize: 11 }}
+              tickLine={false}
+              axisLine={{ stroke: '#E7E2D6' }}
+              tickFormatter={(v) => fmtUSDcompact(v)}
+              width={56}
+            />
+            <Tooltip
+              contentStyle={{ background: '#FBF8F3', border: '1px solid #E7E2D6', borderRadius: 8, fontSize: 12 }}
+              labelFormatter={(m) => m === 0 ? 'Down payment day' : `Month ${m}`}
+              formatter={(v, name) => {
+                const veh = vehicles.find((x) => x.id === name);
+                return [fmtUSD(v), veh ? veh.short : name];
+              }}
+            />
+            {breakEven && (
+              <ReferenceLine x={breakEven} stroke="#047857" strokeDasharray="3 3" label={{ value: 'break-even', position: 'top', fill: '#047857', fontSize: 11 }} />
+            )}
+            {vehicles.map((v) => (
+              <Line
+                key={v.id}
+                type="monotone"
+                dataKey={v.id}
+                stroke={ACCENT[v.accent].stroke}
+                strokeWidth={v.id === 'tesla-new-regular' ? 2.5 : 1.75}
+                dot={false}
+                activeDot={{ r: 4 }}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs">
+        {vehicles.map((v) => (
+          <div key={v.id} className="flex items-center gap-2">
+            <span className="w-3 h-0.5 rounded-full" style={{ background: ACCENT[v.accent].stroke }} />
+            <span className="text-stone-600">{v.short}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MonthlyBreakdownChart({ vehicles, globals }) {
+  const data = useMemo(() => {
+    return vehicles.map((v) => {
+      const m = computeMonthly(v, globals);
+      return {
+        name: v.short,
+        Payment: Math.round(m.payment),
+        [v.type === 'EV' ? 'Electricity' : 'Gas']: Math.round(m.fuel),
+        Insurance: Math.round(m.insurance),
+        Maintenance: Math.round(m.maintenance),
+        accent: v.accent,
+      };
+    });
+  }, [vehicles, globals]);
+
+  // Unify "fuel" key for stacking — split into two charts visually doesn't matter; recharts will show both.
+  // To stack cleanly, store all under one "Fuel" key.
+  const unified = useMemo(() => vehicles.map((v) => {
+    const m = computeMonthly(v, globals);
+    return {
+      name: v.short,
+      Payment: Math.round(m.payment),
+      Fuel: Math.round(m.fuel),
+      Insurance: Math.round(m.insurance),
+      Maintenance: Math.round(m.maintenance),
+      Total: Math.round(m.total),
+    };
+  }), [vehicles, globals]);
+
+  return (
+    <div className="rounded-2xl bg-white ring-soft p-6 sm:p-8">
+      <h3 className="display text-2xl font-medium">Where your monthly money goes</h3>
+      <p className="text-sm text-stone-500 mt-1">Stacked monthly cost. Fuel is electricity for EVs and gasoline for the Subaru.</p>
+      <div className="h-72 sm:h-80 mt-6">
+        <ResponsiveContainer>
+          <BarChart data={unified} margin={{ top: 10, right: 24, left: 0, bottom: 0 }}>
+            <CartesianGrid stroke="#E7E2D6" strokeDasharray="2 4" vertical={false} />
+            <XAxis dataKey="name" tick={{ fill: '#57534e', fontSize: 12 }} tickLine={false} axisLine={{ stroke: '#E7E2D6' }} />
+            <YAxis tick={{ fill: '#78716c', fontSize: 11 }} tickLine={false} axisLine={{ stroke: '#E7E2D6' }} tickFormatter={(v) => '$' + v} width={50} />
+            <Tooltip
+              contentStyle={{ background: '#FBF8F3', border: '1px solid #E7E2D6', borderRadius: 8, fontSize: 12 }}
+              formatter={(v, k) => [fmtUSD(v), k]}
+              cursor={{ fill: 'rgba(27,26,23,0.04)' }}
+            />
+            <Bar dataKey="Payment" stackId="a" fill="#1B1A17" radius={[0,0,0,0]} />
+            <Bar dataKey="Fuel" stackId="a" fill="#047857" />
+            <Bar dataKey="Insurance" stackId="a" fill="#b45309" />
+            <Bar dataKey="Maintenance" stackId="a" fill="#a8a29e" radius={[6,6,0,0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-stone-600">
+        <LegendDot color="#1B1A17">Payment</LegendDot>
+        <LegendDot color="#047857">Fuel · electricity or gas</LegendDot>
+        <LegendDot color="#b45309">Insurance</LegendDot>
+        <LegendDot color="#a8a29e">Maintenance</LegendDot>
+      </div>
+    </div>
+  );
+}
+
+function LegendDot({ color, children }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-2.5 h-2.5 rounded-sm" style={{ background: color }} />
+      <span>{children}</span>
+    </div>
+  );
+}
+
+function FuelSavingsChart({ globals, vehicles }) {
+  const data = useMemo(() => {
+    const ev = vehicles.find((v) => v.type === 'EV');
+    const gas = vehicles.find((v) => v.type === 'gas');
+    if (!ev || !gas) return [];
+    const milesRange = [10000, 15000, 20000, 25000, 30000, 35000, 40000];
+    return milesRange.map((annual) => {
+      const monthly = annual / 12;
+      const gasCost = (monthly / gas.mpg) * globals.gasPrice * 12;
+      const elecCost = (monthly / ev.milesPerKwh) * globals.electricityRate * 12;
+      return {
+        miles: annual,
+        Gasoline: Math.round(gasCost),
+        Electricity: Math.round(elecCost),
+        Savings: Math.round(gasCost - elecCost),
+      };
+    });
+  }, [globals, vehicles]);
+
+  return (
+    <div className="rounded-2xl bg-white ring-soft p-6 sm:p-8">
+      <h3 className="display text-2xl font-medium">Why high mileage changes everything</h3>
+      <p className="text-sm text-stone-500 mt-1">Annual fuel cost: gasoline vs. electricity, by miles driven. The gap widens as you drive more.</p>
+      <div className="h-72 sm:h-80 mt-6">
+        <ResponsiveContainer>
+          <ComposedChart data={data} margin={{ top: 10, right: 24, left: 0, bottom: 0 }}>
+            <CartesianGrid stroke="#E7E2D6" strokeDasharray="2 4" vertical={false} />
+            <XAxis dataKey="miles" tickFormatter={(v) => (v/1000) + 'k'} tick={{ fill: '#78716c', fontSize: 11 }} tickLine={false} axisLine={{ stroke: '#E7E2D6' }} />
+            <YAxis tick={{ fill: '#78716c', fontSize: 11 }} tickLine={false} axisLine={{ stroke: '#E7E2D6' }} tickFormatter={(v) => fmtUSDcompact(v)} width={56} />
+            <Tooltip contentStyle={{ background: '#FBF8F3', border: '1px solid #E7E2D6', borderRadius: 8, fontSize: 12 }} formatter={(v) => fmtUSD(v)} labelFormatter={(v) => v.toLocaleString() + ' mi/yr'} />
+            <Area type="monotone" dataKey="Gasoline" stroke="#b45309" fill="#fef3c7" strokeWidth={2} />
+            <Area type="monotone" dataKey="Electricity" stroke="#047857" fill="#d1fae5" strokeWidth={2} />
+            <ReferenceLine x={globals.annualMiles} stroke="#1B1A17" strokeDasharray="3 3" label={{ value: 'you', position: 'top', fill: '#1B1A17', fontSize: 11 }} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-stone-600">
+        <LegendDot color="#b45309">Annual gasoline cost</LegendDot>
+        <LegendDot color="#047857">Annual electricity cost</LegendDot>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WARRANTY RUNWAY (Used Tesla)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function WarrantyRunway({ vehicles, globals }) {
+  const used = vehicles.find((v) => v.id === 'tesla-used');
+  if (!used) return null;
+  const remaining = used.batteryWarrantyMiles - used.startingMiles;
+  const yearsRemaining = remaining / globals.annualMiles;
+  const months = Math.min(96, Math.ceil(yearsRemaining * 12));
+  const data = [];
+  for (let m = 0; m <= 96; m++) {
+    const miles = used.startingMiles + (globals.annualMiles / 12) * m;
+    data.push({
+      month: m,
+      miles: Math.round(miles),
+      warranty: used.batteryWarrantyMiles,
+      out: miles > used.batteryWarrantyMiles ? Math.round(miles) : null,
+    });
+  }
+  return (
+    <div className="rounded-2xl bg-amber-50/60 ring-1 ring-amber-200 p-6 sm:p-8">
+      <div className="flex items-center gap-2 mb-2">
+        <Pill accent="amber">Warranty runway · used Tesla</Pill>
+      </div>
+      <h3 className="display text-2xl font-medium">Two years of warranty, then you own the risk.</h3>
+      <p className="text-sm text-stone-600 mt-2 max-w-2xl leading-relaxed">
+        A 2023 used Model Y typically has ~40k miles already on it. Tesla's battery & drivetrain
+        warranty is 8 years or 100,000 miles, whichever comes first. At {globals.annualMiles.toLocaleString()} miles a year,
+        you'd cross the 100k mark in about <span className="font-medium text-ink">{yearsRemaining.toFixed(1)} years</span>.
+      </p>
+      <div className="h-56 sm:h-64 mt-6">
+        <ResponsiveContainer>
+          <AreaChart data={data}>
+            <CartesianGrid stroke="#FCE7B7" strokeDasharray="2 4" vertical={false} />
+            <XAxis dataKey="month" tickFormatter={(m) => m === 0 ? 'now' : `yr ${(m/12).toFixed(0)}`} ticks={[0,12,24,36,48,60,72,84,96]} tick={{ fill: '#92400e', fontSize: 11 }} tickLine={false} axisLine={{ stroke: '#FCE7B7' }} />
+            <YAxis tick={{ fill: '#92400e', fontSize: 11 }} tickLine={false} axisLine={{ stroke: '#FCE7B7' }} tickFormatter={(v) => (v/1000) + 'k mi'} width={56} />
+            <Tooltip
+              contentStyle={{ background: '#FFFBF0', border: '1px solid #FCE7B7', borderRadius: 8, fontSize: 12 }}
+              formatter={(v) => v ? v.toLocaleString() + ' mi' : '—'}
+              labelFormatter={(m) => `Year ${(m/12).toFixed(1)}`}
+            />
+            <ReferenceLine y={used.batteryWarrantyMiles} stroke="#b45309" strokeDasharray="3 3" label={{ value: '100k warranty cap', position: 'right', fill: '#b45309', fontSize: 11 }} />
+            <Area type="monotone" dataKey="miles" stroke="#b45309" fill="#fde68a" strokeWidth={2} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+      <p className="text-sm text-stone-600 mt-4 leading-relaxed">
+        After warranty: a high-voltage battery replacement runs $10–20k out of pocket. Probability
+        is low but not zero, and used Teslas already have unknown charging history. New Tesla
+        starts the clock fresh at zero miles — for a high-mileage household, that runway has real
+        dollar value.
+      </p>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ASSUMPTIONS PANEL
+// ─────────────────────────────────────────────────────────────────────────────
+
+function AssumptionsPanel({ globals, setGlobals, vehicles, setVehicles }) {
+  const updateVehicle = (id, patch) => {
+    setVehicles((vs) => vs.map((v) => (v.id === id ? { ...v, ...patch } : v)));
+  };
+
+  return (
+    <Section id="assumptions" eyebrow="Adjustable" title="Change the numbers. Watch the verdict change."
+      subtitle="Every value the math depends on is here. Defaults reflect a realistic high-mileage household, but every family is different.">
+      <div className="grid lg:grid-cols-3 gap-6">
+        <div className="rounded-2xl bg-white ring-soft p-6 sm:p-7">
+          <h4 className="display text-xl font-medium mb-1">Your situation</h4>
+          <p className="text-xs text-stone-500 mb-5">Annual driving, fuel & power prices, current spend.</p>
+          <div className="space-y-5">
+            <Slider label="Annual miles" value={globals.annualMiles} onChange={(v) => setGlobals({...globals, annualMiles: v, monthlyMiles: Math.round(v/12)})} min={8000} max={50000} step={1000} format={(v) => v.toLocaleString() + ' mi'} hint={`That's ~${Math.round(globals.annualMiles/12).toLocaleString()} mi/mo, or ~${Math.round(globals.annualMiles/250)} mi each workday`} />
+            <Slider label="Gas price" value={globals.gasPrice} onChange={(v) => setGlobals({...globals, gasPrice: v})} min={2.5} max={6} step={0.05} format={(v) => '$' + v.toFixed(2) + '/gal'} />
+            <Slider label="Electricity rate" value={globals.electricityRate} onChange={(v) => setGlobals({...globals, electricityRate: v})} min={0.08} max={0.35} step={0.01} format={(v) => '$' + v.toFixed(2) + '/kWh'} hint="National average is ~$0.16; off-peak home charging is often $0.10–0.14" />
+            <Slider label="Down payment (for Teslas)" value={globals.downPayment} onChange={(v) => setGlobals({...globals, downPayment: v})} min={0} max={30000} step={500} format={(v) => fmtUSD(v)} hint="Subaru defaults to family loan with $0 down" />
+            <Slider label="Current gas spend (today)" value={globals.currentGasSpend} onChange={(v) => setGlobals({...globals, currentGasSpend: v})} min={200} max={1200} step={25} format={(v) => fmtUSD(v) + '/mo'} />
+            <Slider label="Current maintenance (today)" value={globals.currentMaintenanceSpend} onChange={(v) => setGlobals({...globals, currentMaintenanceSpend: v})} min={50} max={400} step={10} format={(v) => fmtUSD(v) + '/mo'} />
+          </div>
+        </div>
+
+        {vehicles.map((v) => {
+          const a = ACCENT[v.accent];
+          return (
+            <div key={v.id} className="rounded-2xl bg-white ring-soft p-6 sm:p-7">
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`w-2 h-2 rounded-full ${a.dot}`} />
+                <h4 className="display text-xl font-medium">{v.short}</h4>
+              </div>
+              <p className="text-xs text-stone-500 mb-5">{v.tagline}</p>
+              <div className="space-y-5">
+                <NumberInput label="Purchase price" value={v.price} onChange={(val) => updateVehicle(v.id, { price: val })} prefix="$" step={500} />
+                <div className="grid grid-cols-2 gap-3">
+                  <NumberInput label="APR" value={v.apr} onChange={(val) => updateVehicle(v.id, { apr: val })} suffix="%" step={0.1} />
+                  <NumberInput label="Loan months" value={v.loanMonths} onChange={(val) => updateVehicle(v.id, { loanMonths: Math.max(1, Math.round(val)) })} step={6} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <NumberInput label="Insurance / mo" value={v.insurance} onChange={(val) => updateVehicle(v.id, { insurance: val })} prefix="$" step={5} />
+                  <NumberInput label="Maintenance / mo" value={v.maintenance} onChange={(val) => updateVehicle(v.id, { maintenance: val })} prefix="$" step={5} />
+                </div>
+                {v.type === 'EV' ? (
+                  <NumberInput label="Efficiency" value={v.milesPerKwh} onChange={(val) => updateVehicle(v.id, { milesPerKwh: val })} suffix="mi/kWh" step={0.1} hint="Model Y typically gets 3.3–3.8 in mixed driving" />
+                ) : (
+                  <NumberInput label="Fuel economy" value={v.mpg} onChange={(val) => updateVehicle(v.id, { mpg: val })} suffix="mpg" step={1} />
+                )}
+                <NumberInput label="Turo daily rate" value={v.turoDaily} onChange={(val) => updateVehicle(v.id, { turoDaily: val })} prefix="$" suffix="/day" step={1} hint="After Turo fees. Defaults sourced from Turo's calculator." />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TURO / ROBOTAXI (Speculative)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function turoNetMonthly(vehicle, daysPerMonth, reservePerDay) {
+  if (!vehicle.turoDaily) return 0;
+  return Math.max(0, (vehicle.turoDaily - reservePerDay) * daysPerMonth);
+}
+
+function TuroSection({ globals, vehicles }) {
+  // Default: ~half-time availability. ~12 rental days/month ≈ Turo's "Avg earnings" quote.
+  const [daysPerMonth, setDaysPerMonth] = useState(12);
+  const [reservePerDay, setReservePerDay] = useState(25);
+  const [robotaxiMonthly, setRobotaxiMonthly] = useState(0);
+  const [robotaxiEnabled, setRobotaxiEnabled] = useState(false);
+
+  const rows = vehicles.map((v) => {
+    const m = computeMonthly(v, globals);
+    const turoGross = (v.turoDaily || 0) * daysPerMonth;
+    const turoReserve = daysPerMonth * reservePerDay;
+    const turoNet = Math.max(0, turoGross - turoReserve);
+    const annualNet = turoNet * 12;
+    const annualLoan = m.payment * Math.min(12, v.loanMonths);
+    const roi = annualLoan > 0 ? (annualNet / annualLoan) * 100 : null;
+    const monthlyAfter = m.total - turoNet - (robotaxiEnabled ? robotaxiMonthly : 0);
+    return {
+      v, m, turoGross, turoReserve, turoNet, annualNet, annualLoan, roi, monthlyAfter,
+    };
+  });
+
+  const minAfter = Math.min(...rows.map((r) => r.monthlyAfter));
+
+  return (
+    <Section id="upside" eyebrow="Optional side income" title="Turo income, applied to each vehicle."
+      subtitle="The defaults below come from Turo's calculator for each vehicle, set to roughly half-time availability — the realistic case when the car is rented while you're out of town or when you don't need both cars. Toggle robotaxi separately as a speculative line.">
+
+      <div className="rounded-2xl bg-white ring-soft p-6 sm:p-8 mb-6">
+        <p className="text-sm text-stone-600 leading-relaxed">
+          <span className="text-ink font-medium">Note on availability.</span>{' '}
+          A car already driving 30,000 personal miles a year has limited extra capacity for rentals.
+          At 12 rental days a month, you're adding roughly 6,000–10,000 Turo miles a year on top
+          of personal use. Watch your maintenance line — at very high total annual mileage, tire and
+          brake costs accelerate.
+        </p>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-6 mb-8">
+        <div className="rounded-2xl bg-white ring-soft p-6 sm:p-7">
+          <h4 className="display text-xl font-medium mb-1">Turo settings</h4>
+          <p className="text-xs text-stone-500 mb-5">Applies to all vehicles. Per-vehicle daily rates live in the Assumptions section.</p>
+          <div className="space-y-5">
+            <Slider label="Rental days per month" value={daysPerMonth} onChange={setDaysPerMonth} min={0} max={24} step={1} format={(v) => v + ' days'} hint="12 days ≈ half-time. Turo's quoted average earnings assume ~12–15 days/mo." />
+            <Slider label="Reserve per rental day" value={reservePerDay} onChange={setReservePerDay} min={0} max={75} step={5} format={(v) => '$' + v + '/day'} hint="Cleaning, fuel/charge top-up, claim deductible buffer. ~$20–30/day is realistic." />
+          </div>
+        </div>
+
+        <div className="rounded-2xl bg-white ring-soft p-6 sm:p-7">
+          <div className="flex items-center justify-between mb-1">
+            <h4 className="display text-xl font-medium">Robotaxi (speculative)</h4>
+            <Toggle on={robotaxiEnabled} onChange={setRobotaxiEnabled} />
+          </div>
+          <p className="text-xs text-stone-500 mb-5">No regulatory framework yet for owner-operator robotaxi income at scale. Treat as scenario, not forecast.</p>
+          <div className={`space-y-5 transition-opacity ${robotaxiEnabled ? '' : 'opacity-40 pointer-events-none'}`}>
+            <Slider label="Hypothetical net monthly income" value={robotaxiMonthly} onChange={setRobotaxiMonthly} min={0} max={1500} step={50} format={(v) => '$' + v + '/mo'} />
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl bg-white ring-soft overflow-hidden">
+        <div className="px-6 sm:px-8 py-5 border-b border-stone-100">
+          <h4 className="display text-xl font-medium">Per-vehicle comparison · with Turo applied</h4>
+          <p className="text-xs text-stone-500 mt-1">Net monthly cost = vehicle all-in − Turo net{robotaxiEnabled ? ' − robotaxi income' : ''}.</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-stone-50/60 text-stone-500">
+              <tr className="text-left">
+                <th className="px-4 sm:px-6 py-3 font-medium">Vehicle</th>
+                <th className="px-3 py-3 font-medium mono text-[11px] tracking-wider uppercase">Daily rate</th>
+                <th className="px-3 py-3 font-medium mono text-[11px] tracking-wider uppercase">Turo net /mo</th>
+                <th className="px-3 py-3 font-medium mono text-[11px] tracking-wider uppercase">Turo net /yr</th>
+                <th className="px-3 py-3 font-medium mono text-[11px] tracking-wider uppercase">Annual loan</th>
+                <th className="px-3 py-3 font-medium mono text-[11px] tracking-wider uppercase">Coverage</th>
+                <th className="px-4 sm:px-6 py-3 font-medium mono text-[11px] tracking-wider uppercase text-right">Net /mo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => {
+                const a = ACCENT[r.v.accent];
+                const isMin = r.monthlyAfter === minAfter;
+                return (
+                  <tr key={r.v.id} className={`border-t border-stone-100 ${isMin ? a.bg : ''}`}>
+                    <td className="px-4 sm:px-6 py-3.5">
+                      <div className="flex items-center gap-2">
+                        <span className={`w-1.5 h-1.5 rounded-full ${a.dot}`} />
+                        <span className="text-ink font-medium">{r.v.short}</span>
+                      </div>
+                      <div className="text-xs text-stone-500 mt-0.5">{r.v.tagline}</div>
+                    </td>
+                    <td className="px-3 py-3.5 mono number-tabular text-stone-700">{fmtUSD(r.v.turoDaily || 0)}</td>
+                    <td className="px-3 py-3.5 mono number-tabular text-emerald-700">{fmtUSD(r.turoNet)}</td>
+                    <td className="px-3 py-3.5 mono number-tabular text-stone-700">{fmtUSD(r.annualNet)}</td>
+                    <td className="px-3 py-3.5 mono number-tabular text-stone-700">{fmtUSD(r.annualLoan)}</td>
+                    <td className="px-3 py-3.5 mono number-tabular text-stone-700">{r.roi !== null ? r.roi.toFixed(0) + '%' : '—'}</td>
+                    <td className={`px-4 sm:px-6 py-3.5 mono number-tabular text-right ${isMin ? a.text + ' font-medium' : 'text-ink'}`}>{fmtUSD(r.monthlyAfter)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="px-6 sm:px-8 py-4 text-xs text-stone-500 border-t border-stone-100 leading-relaxed">
+          <span className="text-ink font-medium">Coverage</span> = Turo earnings ÷ annual loan payments. Above 100% means Turo more than pays the loan. The Subaru's lower loan cost shows up here — but the Tesla's lower fuel cost dominates the overall monthly figure on the right.
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+function Toggle({ on, onChange }) {
+  return (
+    <button
+      onClick={() => onChange(!on)}
+      className={`relative w-10 h-6 rounded-full transition-colors ${on ? 'bg-emerald-600' : 'bg-stone-300'}`}
+      aria-pressed={on}
+    >
+      <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-4' : ''}`} />
+    </button>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SUMMARY NOTE
+// ─────────────────────────────────────────────────────────────────────────────
+
+function SummaryNote({ vehicles, globals, winnerId, currentMonthly }) {
+  const [copied, setCopied] = useState(false);
+  const winner = vehicles.find((v) => v.id === winnerId);
+  const subaru = vehicles.find((v) => v.id === 'subaru-used');
+  const wm = winner ? computeMonthly(winner, globals) : null;
+  const sm = subaru ? computeMonthly(subaru, globals) : null;
+
+  const text = useMemo(() => {
+    if (!winner || !wm) return '';
+    const lines = [];
+    lines.push('Vehicle decision · the numbers');
+    lines.push('');
+    lines.push(`Annual driving: ${globals.annualMiles.toLocaleString()} miles (roughly 2× the US average).`);
+    lines.push(`Current spend: ${fmtUSD(globals.currentGasSpend)}/mo gasoline + ${fmtUSD(globals.currentMaintenanceSpend)}/mo maintenance ≈ ${fmtUSD((globals.currentGasSpend + globals.currentMaintenanceSpend) * 12)}/yr.`);
+    lines.push('');
+    lines.push('All-in monthly cost (payment + fuel/electricity + insurance + maintenance):');
+    vehicles.forEach((v) => {
+      const m = computeMonthly(v, globals);
+      lines.push(`  • ${v.name}: ${fmtUSD(m.total)}/mo`);
+    });
+    lines.push('');
+    lines.push('Five-year total cash out (includes down payment):');
+    vehicles.forEach((v) => {
+      const t = totalAtMonth(v, globals, 60);
+      lines.push(`  • ${v.name}: ${fmtUSD(t)}`);
+    });
+    lines.push('');
+    lines.push(`Lowest five-year total: ${winner.name}.`);
+    lines.push('');
+    if (winner.type === 'EV' && subaru) {
+      const fuelDelta = sm.fuel - wm.fuel;
+      lines.push(`Fuel cost detail: at ${globals.annualMiles.toLocaleString()} mi/yr, gasoline costs ~${fmtUSD(sm.fuel)}/mo vs. ~${fmtUSD(wm.fuel)}/mo on electricity. Difference: ${fmtUSD(fuelDelta)}/mo, or ${fmtUSD(fuelDelta * 12)}/yr.`);
+      lines.push('');
+    }
+    lines.push('Not included in the headline numbers above: Turo income, robotaxi income, federal EV tax credit (up to $7,500), sales tax, dealer fees, resale value, depreciation. Turo income is shown separately in the comparison.');
+    lines.push('');
+    lines.push('Items to verify before signing:');
+    lines.push('  • Real insurance quotes per vehicle (can swing the result $50–100/mo)');
+    lines.push('  • Home charging access and actual electricity rate');
+    lines.push('  • Test drive — comfort matters at 3 hours/day');
+    return lines.join('\n');
+  }, [vehicles, globals, winnerId, currentMonthly, winner, wm, sm, subaru]);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  return (
+    <Section id="summary" eyebrow="Plain summary" title="The whole picture, in one page."
+      subtitle="A printable, copy-pasteable version of the analysis. No persuasion — just the numbers and the assumptions behind them.">
+      <div className="rounded-2xl bg-white ring-soft p-6 sm:p-10">
+        <div className="flex items-center justify-between mb-6 no-print">
+          <div className="text-xs mono uppercase tracking-[0.18em] text-stone-500">Shareable note</div>
+          <div className="flex gap-2">
+            <button onClick={copy} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-ink text-paper hover:bg-stone-800 transition">
+              {copied ? '✓ Copied' : 'Copy text'}
+            </button>
+            <button onClick={() => window.print()} className="px-3 py-1.5 rounded-lg text-xs font-medium ring-1 ring-stone-300 text-stone-700 hover:bg-stone-50 transition">
+              Print
+            </button>
+          </div>
+        </div>
+        <pre className="whitespace-pre-wrap text-[15px] leading-[1.7] text-stone-800 font-sans" style={{ fontFamily: 'Fraunces, Georgia, serif' }}>
+{text}
+        </pre>
+      </div>
+    </Section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FOOTER / DISCLAIMERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function Disclaimers() {
+  return (
+    <Section className="py-16">
+      <div className="border-t border-stone-200 pt-10">
+        <div className="grid sm:grid-cols-2 gap-8 text-sm text-stone-600 leading-relaxed">
+          <div>
+            <div className="mono text-[10px] tracking-[0.18em] uppercase text-stone-500 mb-2">What this is</div>
+            A model for thinking, not a forecast. Defaults come from public Tesla pricing,
+            US average electricity & gas, and reasonable maintenance averages. Your real numbers
+            will differ — adjust the inputs to match your situation.
+          </div>
+          <div>
+            <div className="mono text-[10px] tracking-[0.18em] uppercase text-stone-500 mb-2">What it doesn't account for</div>
+            Sales tax & dealer fees, resale value, tax credits (federal EV credit can be $7,500),
+            home charger install cost, depreciation curves, and the real-world variance in insurance
+            quotes. Get an actual quote before signing anything.
+          </div>
+          <div>
+            <div className="mono text-[10px] tracking-[0.18em] uppercase text-stone-500 mb-2">Speculative items</div>
+            Turo income depends on demand, location, vehicle availability, and your tolerance for
+            strangers in your car. Robotaxi revenue is not currently available to individual Tesla
+            owners and may never be at the scale advertised.
+          </div>
+          <div>
+            <div className="mono text-[10px] tracking-[0.18em] uppercase text-stone-500 mb-2">Battery & warranty</div>
+            Tesla's battery & drivetrain warranty: 8 years or 100,000 miles, minimum 70% retention.
+            At 30k miles/yr, used Teslas with 40k+ miles burn through warranty fast. New starts the
+            clock fresh.
+          </div>
+        </div>
+        <div className="mt-10 text-xs text-stone-400">
+          This is a personal decision tool, not financial advice. The author has no affiliation with Tesla, Subaru, Turo, or any financing institution.
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// APP
+// ─────────────────────────────────────────────────────────────────────────────
+
+function App() {
+  const [globals, setGlobals] = useState(DEFAULT_GLOBALS);
+  const [vehicles, setVehicles] = useState(DEFAULT_VEHICLES);
+
+  const winnerId = useMemo(() => {
+    // Score on 5-year total
+    let best = vehicles[0];
+    let bestTotal = totalAtMonth(best, globals, 60);
+    vehicles.forEach((v) => {
+      const t = totalAtMonth(v, globals, 60);
+      if (t < bestTotal) { best = v; bestTotal = t; }
+    });
+    return best.id;
+  }, [vehicles, globals]);
+
+  const runnerId = useMemo(() => {
+    const sorted = [...vehicles].sort((a, b) => totalAtMonth(a, globals, 60) - totalAtMonth(b, globals, 60));
+    return sorted[1]?.id;
+  }, [vehicles, globals]);
+
+  const currentMonthly = globals.currentGasSpend + globals.currentMaintenanceSpend;
+
+  return (
+    <div className="min-h-screen">
+      <Header />
+      <Hero />
+      <Verdict vehicles={vehicles} globals={globals} winnerId={winnerId} runnerId={runnerId} currentMonthly={currentMonthly} />
+      <SituationStrip globals={globals} />
+      <VehicleCards vehicles={vehicles} globals={globals} winnerId={winnerId} />
+      <div className="h-16" />
+      <Section id="charts" eyebrow="The numbers, visually" title="Three charts, three questions."
+        subtitle="One: how does total cash out grow over 5 years? Two: where does each dollar go each month? Three: why does mileage matter so much?">
+        <div className="space-y-6">
+          <CumulativeChart vehicles={vehicles} globals={globals} />
+          <div className="grid lg:grid-cols-2 gap-6">
+            <MonthlyBreakdownChart vehicles={vehicles} globals={globals} />
+            <FuelSavingsChart vehicles={vehicles} globals={globals} />
+          </div>
+        </div>
+      </Section>
+      <div className="h-16" />
+      <Section eyebrow="The used Tesla question" title="Why $10k of savings might not be $10k of savings.">
+        <WarrantyRunway vehicles={vehicles} globals={globals} />
+      </Section>
+      <div className="h-16" />
+      <AssumptionsPanel globals={globals} setGlobals={setGlobals} vehicles={vehicles} setVehicles={setVehicles} />
+      <div className="h-16" />
+      <TuroSection globals={globals} vehicles={vehicles} winnerId={winnerId} />
+      <div className="h-16" />
+      <SummaryNote vehicles={vehicles} globals={globals} winnerId={winnerId} currentMonthly={currentMonthly} />
+      <Disclaimers />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
