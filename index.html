@@ -36,7 +36,7 @@
   details > summary { list-style: none; cursor: pointer; }
   details > summary::-webkit-details-marker { display: none; }
   .inline-num {
-    width: 4.5rem;
+    width: 5rem;
     background: transparent;
     border: 0;
     border-bottom: 1px dotted #c7c2b8;
@@ -99,23 +99,22 @@ function effectiveDown(v, globalDown) {
 
 function computeMonthly(v, g) {
   const down = effectiveDown(v, g.downPayment);
-  const payment = monthlyLoanPayment(v.price, down, v.apr, v.loanMonths);
+  const loanPmt = monthlyLoanPayment(v.price, down, v.apr, v.loanMonths);
+  const fees = v.feesPerMonth || 0;
+  const payment = loanPmt + fees;
   const fuel = fuelMonthly(v, g.monthlyMiles, g.gasPrice, g.electricityRate);
   return {
-    payment, fuel, insurance: v.insurance, maintenance: v.maintenance,
+    payment, loanPmt, fees, fuel,
+    insurance: v.insurance, maintenance: v.maintenance,
     total: payment + fuel + v.insurance + v.maintenance,
     downPayment: down,
   };
 }
 
-function remainingLoanBalance(v, g, atMonth) {
+function remainingLoanCommitment(v, g, atMonth) {
+  const m = computeMonthly(v, g);
   if (atMonth >= v.loanMonths) return 0;
-  const principal = Math.max(0, v.price - effectiveDown(v, g.downPayment));
-  if (principal === 0) return 0;
-  if (v.apr === 0) return principal * (v.loanMonths - atMonth) / v.loanMonths;
-  const r = v.apr / 100 / 12;
-  const pmt = monthlyLoanPayment(v.price, effectiveDown(v, g.downPayment), v.apr, v.loanMonths);
-  return Math.max(0, principal * Math.pow(1 + r, atMonth) - pmt * (Math.pow(1 + r, atMonth) - 1) / r);
+  return (v.loanMonths - atMonth) * m.payment;
 }
 
 function totalAtMonth(v, g, atMonth) {
@@ -125,7 +124,7 @@ function totalAtMonth(v, g, atMonth) {
 }
 
 function trueCostAtMonth(v, g, atMonth) {
-  return totalAtMonth(v, g, atMonth) + remainingLoanBalance(v, g, atMonth);
+  return totalAtMonth(v, g, atMonth) + remainingLoanCommitment(v, g, atMonth);
 }
 
 function cumulativeSeries(v, g, horizonMonths = 60) {
@@ -146,9 +145,9 @@ function cumulativeSeries(v, g, horizonMonths = 60) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const DEFAULT_GLOBALS = {
-  annualMiles: 30000,
-  monthlyMiles: 2500,
-  gasPrice: 3.25,
+  annualMiles: 35000,
+  monthlyMiles: 2917,
+  gasPrice: 4.10,
   electricityRate: 0.14,
   downPayment: 20000,
 };
@@ -158,8 +157,8 @@ const DEFAULT_VEHICLES = [
     id: 'tesla-new-regular',
     name: 'Tesla Model Y AWD',
     short: 'Model Y',
-    tagline: 'New · 0% APR, 60 mo',
-    price: 40000, apr: 0, loanMonths: 60,
+    tagline: 'New · 0% APR · 72 mo · tax & title rolled in',
+    price: 40000, apr: 0, loanMonths: 72, feesPerMonth: 88,
     type: 'EV', milesPerKwh: 3.6,
     insurance: 190, maintenance: 55,
     accent: 'emerald',
@@ -169,8 +168,8 @@ const DEFAULT_VEHICLES = [
     id: 'tesla-new-premium',
     name: 'Tesla Model Y Premium AWD',
     short: 'Model Y Premium',
-    tagline: 'New · 0.99% APR, 60 mo',
-    price: 50000, apr: 0.99, loanMonths: 60,
+    tagline: 'New · 0.99% APR · 72 mo · tax & title rolled in',
+    price: 50000, apr: 0.99, loanMonths: 72, feesPerMonth: 55,
     type: 'EV', milesPerKwh: 3.5,
     insurance: 210, maintenance: 60,
     accent: 'sky',
@@ -353,6 +352,11 @@ function ComparisonTable({ vehicles, globals, setVehicles, winnerId, monthlyWinn
           </p>
         </div>
 
+        <div className="sm:hidden px-5 pt-2 pb-1 flex items-center gap-2 text-xs text-stone-500 bg-stone-50/40 border-t border-stone-100">
+          <span aria-hidden>←</span>
+          <span>Swipe across the table to see all columns</span>
+          <span aria-hidden>→</span>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -383,8 +387,8 @@ function ComparisonTable({ vehicles, globals, setVehicles, winnerId, monthlyWinn
                       </div>
                       <div className="text-xs text-stone-500 mt-0.5">{v.tagline}</div>
                     </td>
-                    <td className="px-2 py-4 mono text-sm number-tabular text-stone-700 whitespace-nowrap">
-                      {fmtUSDcompact(v.price)}
+                    <td className="px-2 py-4 whitespace-nowrap">
+                      <InlineNum value={v.price} onChange={(val) => updateVehicle(v.id, { price: val })} />
                     </td>
                     <td className="px-2 py-4 mono text-sm number-tabular text-stone-700 whitespace-nowrap">
                       {fmtUSD(m.payment)}
