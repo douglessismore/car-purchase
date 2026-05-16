@@ -896,6 +896,46 @@ function BuzzBusinessCase() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SOL SOLACE WRAP MOCKUPS (collapsible)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function WrapMockups() {
+  return (
+    <div className="space-y-5">
+      <p className="text-sm text-stone-600 leading-relaxed">
+        Two concept directions for a Sol Solace wrap on the ID Buzz. The flat side panels and
+        tall profile give the Buzz a real billboard quality at street level — meaningfully more
+        visible per mile than a wrapped sedan or SUV would be.
+      </p>
+      <div className="grid sm:grid-cols-2 gap-4">
+        <a href="img/wrap-mockup-1.jpg" target="_blank" rel="noopener" className="block group">
+          <div className="rounded-xl overflow-hidden ring-soft bg-stone-100">
+            <img src="img/wrap-mockup-1.jpg"
+                 alt="Sol Solace ID Buzz wrap concept — terracotta and soft clay palette"
+                 className="w-full h-auto block transition-transform group-hover:scale-[1.01]"
+                 loading="lazy" />
+          </div>
+          <div className="mt-2 text-xs text-stone-500">Concept 1 · terracotta + soft clay palette</div>
+        </a>
+        <a href="img/wrap-mockup-2.jpg" target="_blank" rel="noopener" className="block group">
+          <div className="rounded-xl overflow-hidden ring-soft bg-stone-100">
+            <img src="img/wrap-mockup-2.jpg"
+                 alt="Sol Solace ID Buzz wrap concept — jungle teal and sand gold palette"
+                 className="w-full h-auto block transition-transform group-hover:scale-[1.01]"
+                 loading="lazy" />
+          </div>
+          <div className="mt-2 text-xs text-stone-500">Concept 2 · jungle teal + sand gold palette</div>
+        </a>
+      </div>
+      <p className="text-xs text-stone-500 leading-relaxed">
+        Tap either image to open it full-size. These are AI-generated visualizations for
+        directional planning — a wrap shop will need print-ready files from a designer.
+      </p>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ID BUZZ TRIM PICKER (collapsible)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1267,6 +1307,11 @@ function App() {
         <Collapsible eyebrow="ID Buzz · the business angle" title="Why a quirky van might out-perform on after-tax math"
                      summary="Section 179, the lease-based federal EV credit, and the wrap as a marketing expense. Where the Buzz wins (and where it doesn't).">
           <BuzzBusinessCase />
+        </Collapsible>
+
+        <Collapsible eyebrow="Sol Solace wrap · concepts" title="What a wrapped Buzz could look like" defaultOpen
+                     summary="Two AI-generated palette directions on the ID Buzz silhouette.">
+          <WrapMockups />
         </Collapsible>
 
         <Collapsible eyebrow="ID Buzz · pick a trim" title="Pro S vs. Pro S Plus vs. 1st Edition"
