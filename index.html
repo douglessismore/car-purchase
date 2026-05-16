@@ -815,6 +815,149 @@ function NotesBlock() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ID BUZZ ADJUSTED ECONOMICS (collapsible, live calc)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function BuzzAdjustedEconomics({ vehicles, globals }) {
+  const buzz = vehicles.find((v) => v.id === 'vw-id-buzz');
+  const teslaY = vehicles.find((v) => v.id === 'tesla-new-regular');
+  if (!buzz) return null;
+
+  const [taxRate, setTaxRate] = useState(32);
+  const [businessUsePct, setBusinessUsePct] = useState(75);
+  const [wrapCost, setWrapCost] = useState(5000);
+  const [structure, setStructure] = useState('purchase');
+
+  const baseFiveYr = trueCostAtMonth(buzz, globals, 60);
+  const businessBasis = buzz.price * (businessUsePct / 100);
+
+  // ID Buzz: Section 179 only applies on purchase. Lease path = $7,500 federal commercial EV credit.
+  const buzzSec179Cap = 30500;
+  const buzzSec179 = structure === 'purchase' ? Math.min(buzzSec179Cap, businessBasis) : 0;
+  const buzzSec179Savings = buzzSec179 * (taxRate / 100);
+  const buzzWrapSavings = wrapCost * (taxRate / 100);
+  const buzzEvCredit = structure === 'lease' ? 7500 : 0;
+  const buzzAdjusted = baseFiveYr - buzzSec179Savings - buzzWrapSavings - buzzEvCredit;
+
+  // Tesla Y comparison: federal EV credit on purchase (Austin-built) + smaller Section 179 (light vehicle cap)
+  const teslaBase = teslaY ? trueCostAtMonth(teslaY, globals, 60) : 0;
+  const teslaSec179Cap = 12200;
+  const teslaSec179 = teslaY ? Math.min(teslaSec179Cap, teslaY.price * (businessUsePct / 100)) : 0;
+  const teslaSec179Savings = teslaSec179 * (taxRate / 100);
+  const teslaAdjusted = teslaY ? teslaBase - 7500 - teslaSec179Savings : 0;
+  const gap = buzzAdjusted - teslaAdjusted;
+
+  return (
+    <div className="space-y-6">
+      <p className="text-sm text-stone-600 leading-relaxed">
+        The main table shows the ID Buzz at <span className="font-medium text-ink">{fmtUSDcompact(baseFiveYr)}</span> over
+        five years — pure cash out, before business tax benefits. (The {fmtUSDcompact(72000 - buzz.price)} dealer discount
+        off the $72k MSRP <em>is</em> already in.) Below is the same number adjusted for the deductions and credits
+        Sol Solace could legitimately claim.
+      </p>
+
+      <div className="rounded-xl ring-soft p-5 bg-stone-50/40 space-y-5 sm:space-y-6">
+        <div>
+          <div className="text-sm text-stone-700 mb-2">Structure</div>
+          <div className="inline-flex rounded-lg ring-1 ring-stone-300 bg-white overflow-hidden">
+            <button onClick={() => setStructure('purchase')}
+              className={`px-4 py-1.5 text-sm transition ${structure === 'purchase' ? 'bg-ink text-paper' : 'text-stone-700 hover:bg-stone-50'}`}>
+              Purchase
+            </button>
+            <button onClick={() => setStructure('lease')}
+              className={`px-4 py-1.5 text-sm transition ${structure === 'lease' ? 'bg-ink text-paper' : 'text-stone-700 hover:bg-stone-50'}`}>
+              Lease
+            </button>
+          </div>
+          <div className="text-xs text-stone-500 mt-2">
+            {structure === 'purchase'
+              ? 'Section 179 heavy-SUV deduction applies (up to $30,500).'
+              : 'Federal $7,500 EV credit passes through as cap-cost reduction. No Section 179 on a lease.'}
+          </div>
+        </div>
+        <div className="grid sm:grid-cols-3 gap-5 sm:gap-6">
+          <Slider label="Business use" value={businessUsePct} onChange={setBusinessUsePct}
+                  min={0} max={100} step={5} format={(v) => v + '%'}
+                  hint=">50% required for Section 179." />
+          <Slider label="Effective tax rate" value={taxRate} onChange={setTaxRate}
+                  min={15} max={45} step={1} format={(v) => v + '%'}
+                  hint="Combined federal + state, marginal." />
+          <Slider label="Wrap cost" value={wrapCost} onChange={setWrapCost}
+                  min={2000} max={8000} step={250} format={(v) => fmtUSD(v)}
+                  hint="Deductible as advertising expense." />
+        </div>
+      </div>
+
+      <div className="rounded-xl ring-soft overflow-hidden">
+        <table className="w-full text-sm">
+          <tbody>
+            <tr className="border-b border-stone-100">
+              <td className="px-4 sm:px-6 py-3 text-stone-700">Five-year cost from table</td>
+              <td className="px-4 sm:px-6 py-3 mono number-tabular text-right text-ink">{fmtUSD(baseFiveYr)}</td>
+            </tr>
+            {structure === 'purchase' && buzzSec179Savings > 0 && (
+              <tr className="border-b border-stone-100">
+                <td className="px-4 sm:px-6 py-3 text-stone-600">
+                  <div>− Section 179 tax savings</div>
+                  <div className="text-xs text-stone-400 mt-0.5">{fmtUSD(buzzSec179)} deductible × {taxRate}%</div>
+                </td>
+                <td className="px-4 sm:px-6 py-3 mono number-tabular text-right text-emerald-700">−{fmtUSD(buzzSec179Savings)}</td>
+              </tr>
+            )}
+            {structure === 'lease' && (
+              <tr className="border-b border-stone-100">
+                <td className="px-4 sm:px-6 py-3 text-stone-600">
+                  <div>− Federal commercial EV credit</div>
+                  <div className="text-xs text-stone-400 mt-0.5">Lease structure, passed through in cap-cost reduction</div>
+                </td>
+                <td className="px-4 sm:px-6 py-3 mono number-tabular text-right text-emerald-700">−$7,500</td>
+              </tr>
+            )}
+            <tr className="border-b border-stone-100">
+              <td className="px-4 sm:px-6 py-3 text-stone-600">
+                <div>− Wrap deduction savings</div>
+                <div className="text-xs text-stone-400 mt-0.5">{fmtUSD(wrapCost)} × {taxRate}%</div>
+              </td>
+              <td className="px-4 sm:px-6 py-3 mono number-tabular text-right text-emerald-700">−{fmtUSD(buzzWrapSavings)}</td>
+            </tr>
+            <tr className="bg-rose-50/40">
+              <td className="px-4 sm:px-6 py-4 text-ink font-medium">Adjusted ID Buzz · five-year cost</td>
+              <td className="px-4 sm:px-6 py-4 mono number-tabular text-right">
+                <span className="display text-xl sm:text-2xl text-rose-700">{fmtUSD(buzzAdjusted)}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {teslaY && (
+        <div className="rounded-xl bg-emerald-50/40 ring-1 ring-emerald-100 p-5">
+          <div className="mono text-[10px] tracking-[0.18em] uppercase text-emerald-700 mb-2">Apples-to-apples context</div>
+          <p className="text-sm text-stone-700 leading-relaxed">
+            Tesla Model Y also qualifies for the $7,500 federal credit (Austin-built) and a smaller
+            Section 179 deduction (capped at ~$12,200 since it's a light vehicle).
+            Its comparable adjusted five-year cost is <span className="font-medium text-ink">{fmtUSD(teslaAdjusted)}</span>.
+          </p>
+          <p className="text-sm text-stone-700 leading-relaxed mt-2">
+            <span className="text-ink font-medium">The remaining gap is about {fmtUSDcompact(gap)} over five years.</span>{' '}
+            That's what you'd be paying for the wrap presence, the vehicle's character, and the
+            mobile-brand asset Sol Solace would gain. A real number, not a hidden one — worth
+            knowing what it is so you can decide if it's worth it.
+          </p>
+        </div>
+      )}
+
+      <p className="text-xs text-stone-500 leading-relaxed">
+        Estimates assume Sol Solace has enough business income in year one to absorb the Section 179
+        deduction. Bonus depreciation (~40% in 2025–2026, subject to legislation) on the remainder
+        could add several thousand more in tax savings — not modeled. Confirm with your accountant
+        before relying on these numbers.
+      </p>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ID BUZZ BUSINESS CASE (collapsible)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1304,6 +1447,11 @@ function App() {
       <InputsPanel globals={globals} setGlobals={setGlobals} />
 
       <Section className="space-y-4">
+        <Collapsible eyebrow="ID Buzz · adjusted economics" title="The five-year number, minus the tax angles" defaultOpen
+                     summary="What the headline ID Buzz cost drops to once Section 179, the wrap deduction, and the federal EV credit are stacked in.">
+          <BuzzAdjustedEconomics vehicles={vehicles} globals={globals} />
+        </Collapsible>
+
         <Collapsible eyebrow="ID Buzz · the business angle" title="Why a quirky van might out-perform on after-tax math"
                      summary="Section 179, the lease-based federal EV credit, and the wrap as a marketing expense. Where the Buzz wins (and where it doesn't).">
           <BuzzBusinessCase />
