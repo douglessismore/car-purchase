@@ -200,6 +200,17 @@ const DEFAULT_VEHICLES = [
     batteryWarrantyMiles: 100000,
     turoDaily: 80,
   },
+  {
+    id: 'vw-id-buzz',
+    name: 'VW ID Buzz (AWD)',
+    short: 'ID Buzz',
+    tagline: 'New · ~7% APR · 72 mo · ~$13k off MSRP · US-discontinued',
+    price: 59405, apr: 6.99, loanMonths: 72, feesPerMonth: 90,
+    type: 'EV', milesPerKwh: 2.5,
+    insurance: 215, maintenance: 85,
+    accent: 'rose',
+    turoDaily: 120,
+  },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -221,6 +232,7 @@ const ACCENT = {
   sky:     { text: 'text-sky-700',     bg: 'bg-sky-50',     ring: 'ring-sky-200',     dot: 'bg-sky-600',     stroke: '#0369a1', soft: 'bg-sky-50/60' },
   amber:   { text: 'text-amber-700',   bg: 'bg-amber-50',   ring: 'ring-amber-200',   dot: 'bg-amber-600',   stroke: '#b45309', soft: 'bg-amber-50/60' },
   stone:   { text: 'text-stone-700',   bg: 'bg-stone-100',  ring: 'ring-stone-300',   dot: 'bg-stone-600',   stroke: '#57534e', soft: 'bg-stone-50' },
+  rose:    { text: 'text-rose-700',    bg: 'bg-rose-50',    ring: 'ring-rose-200',    dot: 'bg-rose-600',    stroke: '#be123c', soft: 'bg-rose-50/60' },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -803,6 +815,284 @@ function NotesBlock() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ID BUZZ BUSINESS CASE (collapsible)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function BuzzBusinessCase() {
+  return (
+    <div className="space-y-6 text-sm text-stone-700 leading-relaxed">
+      <p className="text-stone-600">
+        On pure family cash flow, the ID Buzz loses to the Tesla — shorter range, ~40% worse
+        electricity efficiency per mile, no Tesla Supercharger access yet. The argument for it
+        rests on three things the main table can't capture.
+      </p>
+
+      <div className="border-t border-stone-100 pt-5">
+        <h4 className="text-ink font-medium mb-1">1 · Section 179 heavy-vehicle deduction</h4>
+        <p className="text-stone-600">
+          At ~6,945 lb GVWR, the ID Buzz qualifies as a "heavy SUV" for Section 179. If used
+          {' >50% '}for Sol Solace business, you can deduct up to ~$30,500 in year one plus bonus
+          depreciation on the remainder. The Tesla Model Y (~5,302 lb GVWR) doesn't qualify —
+          first-year deduction is capped near $12,200.
+        </p>
+        <p className="text-emerald-700 mt-1.5">
+          At a 32% effective tax rate, that's roughly <span className="font-medium">$5,800 more
+          in first-year tax savings</span> for the Buzz than the Tesla.
+        </p>
+      </div>
+
+      <div className="border-t border-stone-100 pt-5">
+        <h4 className="text-ink font-medium mb-1">2 · Federal $7,500 EV credit (lease only)</h4>
+        <p className="text-stone-600">
+          ID Buzz is built in Hanover, so a direct purchase doesn't qualify for the $7,500
+          federal credit. The leasing loophole works: the leasing company claims the commercial
+          credit and is supposed to pass it through as a cap-cost reduction. Ask every dealer
+          quoting a lease whether the $7,500 is built into the numbers.
+        </p>
+        <p className="text-stone-500 mt-1.5 text-xs">
+          Tesla Model Y (Austin-built) qualifies for the $7,500 credit on purchase or lease,
+          subject to your income limits.
+        </p>
+      </div>
+
+      <div className="border-t border-stone-100 pt-5">
+        <h4 className="text-ink font-medium mb-1">3 · Sol Solace wrap = deductible marketing</h4>
+        <p className="text-stone-600">
+          A full wrap runs $3,000–$6,000 and lasts 5–7 years. Wrapped as Sol Solace, the entire
+          wrap cost is deductible as advertising — separate from the vehicle's depreciation.
+          At 3 hours/day in city traffic, the Buzz's flat sides and quirky silhouette get more
+          eyeballs per mile than a Tesla would.
+        </p>
+      </div>
+
+      <div className="border-t border-stone-100 pt-5">
+        <h4 className="text-ink font-medium mb-1">The honest tradeoffs</h4>
+        <ul className="text-stone-600 space-y-1.5 mt-2">
+          <li><span className="text-stone-800 font-medium">Range:</span> EPA 234 mi (Tesla Y AWD ~310). At 30k+ mi/yr in city traffic you'll charge meaningfully more often.</li>
+          <li><span className="text-stone-800 font-medium">Efficiency:</span> ~2.5 mi/kWh real-world vs. Tesla Y's 3.5–3.6 — ~40% more electricity per mile.</li>
+          <li><span className="text-stone-800 font-medium">Charging:</span> No Tesla Supercharger yet. Electrify America is the primary fast-charge network — fewer locations, less reliable.</li>
+          <li><span className="text-stone-800 font-medium">Warranty:</span> 4 yr / 50k bumper-to-bumper (Tesla also 4 yr / 50k). 8 yr / 100k high-voltage battery — federal minimum, same as Tesla.</li>
+          <li><span className="text-stone-800 font-medium">Discontinuation:</span> US sales discontinued post-2024. Parts and warranty service continue for years (VW is required to support warranties, and major brands typically keep parts pipelines running 10+ years). What it usually does <em>not</em> mean: instant collectible value. Original Microbus took 20–30 years to become collectible. Short term, discontinued status tends to depress resale, not lift it.</li>
+        </ul>
+      </div>
+
+      <div className="border-t border-stone-100 pt-5 -mx-5 sm:-mx-8 px-5 sm:px-8 pb-5 bg-rose-50/30">
+        <h4 className="text-ink font-medium mb-2">The bottom line</h4>
+        <p className="text-stone-700">
+          As a pure family vehicle, the Tesla Model Y is the cleaner choice. The Buzz only beats
+          it when you stack Section 179, the lease-based EV credit, and treat the wrap as a real
+          marketing investment. If Sol Solace can genuinely use the vehicle &gt;50% for business
+          <em> and</em> you'd actually wrap it, the after-tax math gets competitive. If business
+          use is &lt;50% or the wrap is just an "eventually" plan, the Tesla wins.
+        </p>
+        <p className="text-stone-700 mt-3">
+          The decisive question is honesty about business use percentage. Mileage logs, calendar
+          entries, and clear separation between family and business trips would be needed to
+          defend the deduction in an audit.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DEALER OFFER TRACKER (collapsible, localStorage)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function DealerTracker() {
+  const [offers, setOffers] = useState(() => {
+    try {
+      const saved = localStorage.getItem('dealerOffers');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem('dealerOffers', JSON.stringify(offers)); } catch {}
+  }, [offers]);
+
+  const addOffer = () => {
+    setOffers([...offers, {
+      id: Date.now(),
+      dealer: '', city: '', stock: '', otd: '',
+      daysOnLot: '', nextStep: '', notes: '',
+    }]);
+  };
+
+  const updateOffer = (id, patch) => {
+    setOffers((os) => os.map((o) => o.id === id ? { ...o, ...patch } : o));
+  };
+
+  const deleteOffer = (id) => {
+    setOffers((os) => os.filter((o) => o.id !== id));
+  };
+
+  const bestOtd = useMemo(() => {
+    const valid = offers.map((o) => parseFloat(o.otd)).filter((n) => n > 0);
+    return valid.length ? Math.min(...valid) : null;
+  }, [offers]);
+
+  const bestOffer = bestOtd !== null ? offers.find((o) => parseFloat(o.otd) === bestOtd) : null;
+
+  const cellInput = "block w-full bg-transparent border-b border-dotted border-stone-200 hover:border-stone-400 focus:border-ink focus:outline-none";
+
+  return (
+    <div>
+      {bestOffer && (
+        <div className="mb-5 px-4 py-3 rounded-xl bg-emerald-50 ring-1 ring-emerald-200 text-sm flex items-baseline gap-3 flex-wrap">
+          <span className="mono text-[10px] tracking-[0.18em] uppercase text-emerald-700">Best so far</span>
+          <span className="text-ink font-medium mono number-tabular">{fmtUSD(bestOtd)} out-the-door</span>
+          {bestOffer.dealer && <span className="text-stone-600 text-xs">at {bestOffer.dealer}{bestOffer.city ? ` · ${bestOffer.city}` : ''}</span>}
+        </div>
+      )}
+
+      {offers.length === 0 ? (
+        <div className="text-center py-10 px-6 text-stone-500 border-2 border-dashed border-stone-200 rounded-xl">
+          <p className="mb-2 text-stone-700">No dealer offers yet.</p>
+          <p className="text-xs">Add a row when you call your first dealer. Saved in this browser — won't sync across devices.</p>
+        </div>
+      ) : (
+        <div className="rounded-xl ring-soft mb-4 overflow-hidden">
+          <div className="sm:hidden px-4 pt-2 pb-1 text-xs text-stone-500 bg-stone-50/40 flex items-center gap-2">
+            <span aria-hidden>←</span><span>Swipe to see all columns</span><span aria-hidden>→</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-stone-50/60 text-stone-500">
+                <tr className="text-left">
+                  <th className="px-3 py-3 mono text-[10px] tracking-[0.15em] uppercase font-medium">Dealer</th>
+                  <th className="px-3 py-3 mono text-[10px] tracking-[0.15em] uppercase font-medium">Stock</th>
+                  <th className="px-3 py-3 mono text-[10px] tracking-[0.15em] uppercase font-medium">OTD price</th>
+                  <th className="px-3 py-3 mono text-[10px] tracking-[0.15em] uppercase font-medium">Days on lot</th>
+                  <th className="px-3 py-3 mono text-[10px] tracking-[0.15em] uppercase font-medium">Next step</th>
+                  <th className="px-3 py-3 mono text-[10px] tracking-[0.15em] uppercase font-medium">Notes</th>
+                  <th className="px-2 py-3"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {offers.map((o) => {
+                  const isBest = parseFloat(o.otd) === bestOtd && bestOtd > 0;
+                  return (
+                    <tr key={o.id} className={`border-t border-stone-100 align-top ${isBest ? 'bg-emerald-50/40' : ''}`}>
+                      <td className="px-3 py-3 min-w-[140px]">
+                        <input type="text" placeholder="Dealer name" value={o.dealer}
+                          onChange={(e) => updateOffer(o.id, { dealer: e.target.value })}
+                          className={`${cellInput} text-sm text-ink`} />
+                        <input type="text" placeholder="City" value={o.city}
+                          onChange={(e) => updateOffer(o.id, { city: e.target.value })}
+                          className="block w-full bg-transparent border-0 text-xs text-stone-500 focus:outline-none mt-1 p-0" />
+                      </td>
+                      <td className="px-3 py-3 min-w-[90px]">
+                        <input type="text" placeholder="—" value={o.stock}
+                          onChange={(e) => updateOffer(o.id, { stock: e.target.value })}
+                          className={`${cellInput} mono text-xs`} />
+                      </td>
+                      <td className="px-3 py-3 min-w-[110px]">
+                        <input type="number" placeholder="0" value={o.otd}
+                          onChange={(e) => updateOffer(o.id, { otd: e.target.value })}
+                          className={`${cellInput} mono text-sm number-tabular ${isBest ? 'text-emerald-700 font-medium' : 'text-ink'}`} />
+                      </td>
+                      <td className="px-3 py-3 min-w-[80px]">
+                        <input type="text" placeholder="—" value={o.daysOnLot}
+                          onChange={(e) => updateOffer(o.id, { daysOnLot: e.target.value })}
+                          className={`${cellInput} mono text-sm`} />
+                      </td>
+                      <td className="px-3 py-3 min-w-[140px]">
+                        <input type="text" placeholder="Follow up…" value={o.nextStep}
+                          onChange={(e) => updateOffer(o.id, { nextStep: e.target.value })}
+                          className={`${cellInput} text-sm`} />
+                      </td>
+                      <td className="px-3 py-3 min-w-[160px]">
+                        <input type="text" placeholder="" value={o.notes}
+                          onChange={(e) => updateOffer(o.id, { notes: e.target.value })}
+                          className={`${cellInput} text-sm text-stone-700`} />
+                      </td>
+                      <td className="px-2 py-3 text-right whitespace-nowrap">
+                        <button onClick={() => deleteOffer(o.id)}
+                          className="text-stone-300 hover:text-rose-600 text-xl leading-none px-2 py-0.5 transition"
+                          title="Delete row" aria-label="Delete row">×</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <button onClick={addOffer}
+          className="px-4 py-2 rounded-lg bg-ink text-paper text-sm font-medium hover:bg-stone-800 transition">
+          + Add dealer
+        </button>
+        {offers.length > 0 && (
+          <button onClick={() => { if (confirm('Clear all dealer offers?')) setOffers([]); }}
+            className="text-xs text-stone-500 hover:text-rose-600 transition">
+            Clear all
+          </button>
+        )}
+      </div>
+
+      <p className="text-xs text-stone-500 mt-4 leading-relaxed">
+        <span className="text-ink font-medium">OTD price</span> = out-the-door, including tax, title,
+        registration, and all dealer fees. Don't compare anything else. Saved to this browser's
+        local storage.
+      </p>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NEGOTIATION CHECKLIST (collapsible)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function NegotiationChecklist() {
+  return (
+    <div className="space-y-6 text-sm text-stone-700 leading-relaxed">
+      <div>
+        <div className="mono text-[10px] tracking-[0.18em] uppercase text-stone-500 mb-2">Before the call</div>
+        <ul className="space-y-1.5">
+          <li className="flex gap-2"><span className="text-stone-400">·</span><span>Find the stock # from the online listing (VW.com, Cars.com, Autotrader)</span></li>
+          <li className="flex gap-2"><span className="text-stone-400">·</span><span>Note the online asking price for reference</span></li>
+          <li className="flex gap-2"><span className="text-stone-400">·</span><span>Decide in advance: cash, finance through dealer, or lease — affects negotiation</span></li>
+        </ul>
+      </div>
+
+      <div className="border-t border-stone-100 pt-5">
+        <div className="mono text-[10px] tracking-[0.18em] uppercase text-stone-500 mb-2">On the call (in this order)</div>
+        <ol className="space-y-2.5 list-decimal pl-5 marker:text-stone-400 marker:font-medium">
+          <li><span className="text-ink font-medium">Ask for the out-the-door (OTD) price</span> — not the monthly. OTD includes tax, title, registration, and all dealer fees. Anything else is a smokescreen.</li>
+          <li><span className="text-ink font-medium">Ask how long it's been on the lot.</span> 60+ days = motivated dealer. 90+ = very motivated.</li>
+          <li><span className="text-ink font-medium">Ask if it's a demo, loaner, or aged-inventory unit.</span> These get deeper discounts and often have minimal extra miles.</li>
+          <li><span className="text-ink font-medium">Ask what current manufacturer incentives apply.</span> Loyalty, conquest, military, EV — they don't volunteer these.</li>
+          <li><span className="text-ink font-medium">If leasing the ID Buzz:</span> confirm in writing that the $7,500 federal commercial EV credit is built into the cap cost reduction.</li>
+          <li><span className="text-ink font-medium">Refuse all "protection" add-ons</span> — paint sealant, fabric protection, nitrogen tires, VIN etching, extended warranty bundles, dealer doc fees above ~$200. Pure margin, no value.</li>
+          <li><span className="text-ink font-medium">Get the quote in writing (PDF).</span> A texted screenshot also works.</li>
+          <li><span className="text-ink font-medium">After 2–3 written quotes, call the lowest dealer</span> and ask plainly: "Can you beat this?" Show them the next-lowest if needed.</li>
+        </ol>
+      </div>
+
+      <div className="border-t border-stone-100 pt-5">
+        <div className="mono text-[10px] tracking-[0.18em] uppercase text-stone-500 mb-2">Cast a wide net</div>
+        <p>Texas EV inventory varies a lot by metro. Worth calling dealers in <span className="text-ink">Austin, Houston, San Antonio, Dallas, Phoenix</span>. Out-of-state purchase is straightforward — VW will arrange transport, or fly + drive home (often cheaper than the in-state markup).</p>
+      </div>
+
+      <div className="border-t border-stone-100 pt-5">
+        <div className="mono text-[10px] tracking-[0.18em] uppercase text-amber-700 mb-2">Walk-away signals</div>
+        <ul className="space-y-1.5 text-stone-600">
+          <li className="flex gap-2"><span className="text-amber-600">✕</span><span>Won't quote OTD over the phone</span></li>
+          <li className="flex gap-2"><span className="text-amber-600">✕</span><span>"You really need to come in to see the numbers"</span></li>
+          <li className="flex gap-2"><span className="text-amber-600">✕</span><span>Adds unexpected fees after you've agreed on a price</span></li>
+          <li className="flex gap-2"><span className="text-amber-600">✕</span><span>"This price is only good today"</span></li>
+          <li className="flex gap-2"><span className="text-amber-600">✕</span><span>Refuses to itemize the OTD breakdown</span></li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // APP
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -840,8 +1130,23 @@ function App() {
       <InputsPanel globals={globals} setGlobals={setGlobals} />
 
       <Section className="space-y-4">
+        <Collapsible eyebrow="ID Buzz · the business angle" title="Why a quirky van might out-perform on after-tax math"
+                     summary="Section 179, the lease-based federal EV credit, and the wrap as a marketing expense. Where the Buzz wins (and where it doesn't).">
+          <BuzzBusinessCase />
+        </Collapsible>
+
+        <Collapsible eyebrow="Dealer offer tracker" title="One row per dealer you call"
+                     summary="Stores OTD prices and notes in your browser. Highlights the lowest offer automatically.">
+          <DealerTracker />
+        </Collapsible>
+
+        <Collapsible eyebrow="Calling dealers" title="Negotiation checklist"
+                     summary="What to ask, in what order. Plus the signs to walk away.">
+          <NegotiationChecklist />
+        </Collapsible>
+
         <Collapsible eyebrow="Optional side income" title="Turo, applied to each vehicle"
-                     summary="Renting the car part-time when you're out of town or when one car covers both adults. Daily rates from Turo's calculator.">
+                     summary="Renting the car part-time when you're out of town or when one car covers both adults.">
           <TuroBlock vehicles={vehicles} globals={globals} />
         </Collapsible>
 
@@ -851,7 +1156,7 @@ function App() {
         </Collapsible>
 
         <Collapsible eyebrow="Plain version" title="One-page summary"
-                     summary="Printable, copy-pasteable. No persuasion — the numbers, the assumptions, and what to verify.">
+                     summary="Printable, copy-pasteable. The numbers, the assumptions, and what to verify.">
           <SummaryBlock vehicles={vehicles} globals={globals} winnerId={winnerId} />
         </Collapsible>
 
