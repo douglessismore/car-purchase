@@ -896,6 +896,140 @@ function BuzzBusinessCase() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ID BUZZ TRIM PICKER (collapsible)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function BuzzTrimPicker() {
+  const trims = [
+    {
+      name: 'Pro S',
+      sub: 'Base trim',
+      msrp: '~$60k',
+      realistic: '~$50–55k',
+      drivetrain: 'RWD',
+      wheels: '19"',
+      kit: 'Standard interior, base features',
+      status: 'In production (2024 & 2025)',
+      accent: 'emerald',
+    },
+    {
+      name: 'Pro S Plus',
+      sub: 'Mid trim',
+      msrp: '~$63–65k',
+      realistic: '~$55–60k',
+      drivetrain: 'RWD',
+      wheels: '20"',
+      kit: 'Upgraded interior, panoramic roof, more standard features',
+      status: 'In production (2024 & 2025)',
+      accent: 'sky',
+    },
+    {
+      name: '1st Edition',
+      sub: 'Launch trim · 2024 only',
+      msrp: '$72,000',
+      realistic: '~$58–62k (deep discounts)',
+      drivetrain: 'AWD',
+      wheels: '20"',
+      kit: 'Premium materials, signature two-tone paint, fully loaded',
+      status: 'Discontinued · clearance inventory',
+      accent: 'rose',
+    },
+  ];
+
+  const rows = [
+    { label: 'MSRP', key: 'msrp' },
+    { label: 'Realistic OTD', key: 'realistic' },
+    { label: 'Drivetrain', key: 'drivetrain' },
+    { label: 'Wheels', key: 'wheels' },
+    { label: 'Equipment', key: 'kit' },
+    { label: 'Availability', key: 'status' },
+  ];
+
+  return (
+    <div className="space-y-6 text-sm">
+      <p className="text-stone-600 leading-relaxed">
+        All three US trims share the same 91 kWh battery, ~200 kW DC fast-charging peak, and
+        broadly similar real-world range (~230 mi). What changes between trims is the drivetrain,
+        wheel size, interior materials, and how loaded they come — not the underlying EV
+        hardware.
+      </p>
+
+      <div className="rounded-xl ring-soft overflow-hidden">
+        <div className="sm:hidden px-4 pt-2 pb-1 text-xs text-stone-500 bg-stone-50/40 flex items-center gap-2">
+          <span aria-hidden>←</span><span>Swipe to compare trims</span><span aria-hidden>→</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-stone-50/60 text-left text-stone-500">
+                <th className="px-3 sm:px-5 py-3 mono text-[10px] tracking-[0.15em] uppercase font-medium"></th>
+                {trims.map((t) => (
+                  <th key={t.name} className="px-3 py-3 mono text-[10px] tracking-[0.15em] uppercase font-medium min-w-[150px]">
+                    <div className={`${ACCENT[t.accent].text} text-sm normal-case tracking-normal font-semibold`}>{t.name}</div>
+                    <div className="text-stone-400 normal-case tracking-normal mt-0.5">{t.sub}</div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.key} className="border-t border-stone-100 align-top">
+                  <td className="px-3 sm:px-5 py-3 text-stone-500 text-xs whitespace-nowrap">{row.label}</td>
+                  {trims.map((t) => (
+                    <td key={t.name} className="px-3 py-3 text-stone-700">{t[row.key]}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="border-t border-stone-100 pt-5">
+        <h4 className="text-ink font-medium mb-3">Which trim makes sense for your situation</h4>
+        <div className="space-y-3 text-stone-600">
+          <p><span className="text-ink font-medium">Pro S — the cash-flow play.</span> Smallest sticker means the most negotiation room and the lowest financing cost. The 19" wheels are a couple percent more efficient than the 20" — meaningful at 35k mi/yr. Cleanest canvas for a Sol Solace wrap (no two-tone paint underneath). The interior is fine for a daily driver that's getting beaten up anyway.</p>
+          <p><span className="text-ink font-medium">Pro S Plus — small upgrade.</span> Worth it mainly for the upgraded interior and panoramic roof if those matter day-to-day. The 20" wheels cost you a bit of range. For a wrap candidate that runs hard, the upgrade dollars are probably better deployed elsewhere.</p>
+          <p><span className="text-ink font-medium">1st Edition — only worth it at a deep discount.</span> AWD adds capability you'll rarely use in Texas city driving, and the signature two-tone paint disappears under a wrap. The case for it is purely that 2024 leftover inventory is being cleared aggressively — if the OTD lands below ~$60k, you're getting Pro S Plus money for a more-loaded vehicle with AWD as a bonus.</p>
+        </div>
+      </div>
+
+      <div className="border-t border-stone-100 pt-5 -mx-5 sm:-mx-8 px-5 sm:px-8 pb-5 bg-rose-50/30">
+        <h4 className="text-ink font-medium mb-2">The bottom-line ranking for a wrapped business van</h4>
+        <ol className="list-decimal pl-5 marker:text-stone-400 space-y-1.5 text-stone-700">
+          <li><span className="font-medium">Pro S</span> if you want maximum cash flow and don't care about luxury touches</li>
+          <li><span className="font-medium">1st Edition at &lt;$60k OTD</span> if a dealer is desperate to move 2024 inventory</li>
+          <li><span className="font-medium">Pro S Plus</span> as a middle path — only if the dealer comes in tight on Pro S pricing</li>
+        </ol>
+        <p className="text-stone-700 mt-3">
+          The <span className="font-medium">$59,405</span> you found earlier is likely a discounted 1st Edition
+          (matches the $72k MSRP minus ~$12k). If it's actually a Pro S Plus at that price, push back —
+          aggressive Pro S Plus deals should land closer to $55k.
+        </p>
+      </div>
+
+      <div className="border-t border-stone-100 pt-5">
+        <div className="mono text-[10px] tracking-[0.18em] uppercase text-stone-500 mb-2">What to confirm with each dealer</div>
+        <ul className="space-y-1.5 text-stone-700">
+          <li className="flex gap-2"><span className="text-stone-400">·</span><span>Exact trim (Pro S / Pro S Plus / 1st Edition)</span></li>
+          <li className="flex gap-2"><span className="text-stone-400">·</span><span>Model year (1st Edition was 2024-only; 2025 inventory is Pro S / Pro S Plus)</span></li>
+          <li className="flex gap-2"><span className="text-stone-400">·</span><span>RWD or AWD (2025 may add AWD options across trims — verify)</span></li>
+          <li className="flex gap-2"><span className="text-stone-400">·</span><span>Wheel size (affects range — 19" is more efficient)</span></li>
+          <li className="flex gap-2"><span className="text-stone-400">·</span><span>Whether power sliding doors are equipped (typically standard but confirm)</span></li>
+        </ul>
+      </div>
+
+      <p className="text-xs text-stone-500 leading-relaxed">
+        Pricing ranges are approximate from public reporting and 2024–2025 inventory discounting.
+        Always verify exact MSRPs on VW's site and OTD prices in writing from each dealer. The
+        main comparison table at the top uses ~$59,405 as the ID Buzz default — adjust the
+        Sticker column inline to test different trims against the family math.
+      </p>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // DEALER OFFER TRACKER (collapsible, localStorage)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1133,6 +1267,11 @@ function App() {
         <Collapsible eyebrow="ID Buzz · the business angle" title="Why a quirky van might out-perform on after-tax math"
                      summary="Section 179, the lease-based federal EV credit, and the wrap as a marketing expense. Where the Buzz wins (and where it doesn't).">
           <BuzzBusinessCase />
+        </Collapsible>
+
+        <Collapsible eyebrow="ID Buzz · pick a trim" title="Pro S vs. Pro S Plus vs. 1st Edition"
+                     summary="What's actually different between the three US trims and which fits a high-mileage family van that might get wrapped.">
+          <BuzzTrimPicker />
         </Collapsible>
 
         <Collapsible eyebrow="Dealer offer tracker" title="One row per dealer you call"
