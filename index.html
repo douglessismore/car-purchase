@@ -402,8 +402,14 @@ function ComparisonTable({ vehicles, globals, setVehicles, winnerId, monthlyWinn
                     <td className="px-2 py-4 whitespace-nowrap">
                       <InlineNum value={v.price} onChange={(val) => updateVehicle(v.id, { price: val })} />
                     </td>
-                    <td className="px-2 py-4 mono text-sm number-tabular text-stone-700 whitespace-nowrap">
-                      {fmtUSD(m.payment)}
+                    <td className="px-2 py-4 whitespace-nowrap">
+                      <div className="mono text-sm number-tabular text-stone-700">{fmtUSD(m.payment)}</div>
+                      <div className="text-[10px] text-stone-400 mt-0.5 flex items-baseline gap-0.5">
+                        <input type="number" step={0.01} value={v.apr}
+                          onChange={(e) => updateVehicle(v.id, { apr: parseFloat(e.target.value) || 0 })}
+                          className="w-8 bg-transparent border-b border-dotted border-stone-200 hover:border-stone-500 focus:border-ink focus:outline-none mono text-[10px] number-tabular text-stone-500 hover:text-ink focus:text-ink text-right pr-0.5" />
+                        <span>% APR · {v.loanMonths}mo</span>
+                      </div>
                     </td>
                     <td className="px-2 py-4 mono text-sm number-tabular text-stone-700 whitespace-nowrap">
                       {fmtUSD(m.fuel)}
@@ -1039,6 +1045,174 @@ function BuzzBusinessCase() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MOBILE WELLNESS TRAILER (collapsible, live calc)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function MobileTrailerAnalysis() {
+  const [trailerCost, setTrailerCost] = useState(15000);
+  const [buildoutCost, setBuildoutCost] = useState(8000);
+  const [hitchInstall, setHitchInstall] = useState(700);
+  const [monthlyOperating, setMonthlyOperating] = useState(100);
+  const [currentOfficeRent, setCurrentOfficeRent] = useState(4167);
+  const [taxRate, setTaxRate] = useState(32);
+  const [businessUsePct, setBusinessUsePct] = useState(100);
+
+  const upfront = trailerCost + buildoutCost + hitchInstall;
+  const monthlySavings = currentOfficeRent - monthlyOperating;
+  const paybackMonths = monthlySavings > 0 ? upfront / monthlySavings : null;
+
+  // 5-year cash math
+  const fiveYearOffice = currentOfficeRent * 60;
+  const fiveYearTrailer = upfront + monthlyOperating * 60;
+  const fiveYearGrossSavings = fiveYearOffice - fiveYearTrailer;
+
+  // Tax: trailer is fully Section 179 deductible (personal property used in business — no vehicle weight cap)
+  // For 100% business use, the whole upfront is deductible in year 1.
+  const sec179Eligible = upfront * (businessUsePct / 100);
+  const year1TaxSavings = sec179Eligible * (taxRate / 100);
+  // Operating costs are also deductible (so are office rent payments today — that's a wash, so we don't double-count)
+
+  const fiveYearNetSavings = fiveYearGrossSavings + year1TaxSavings;
+
+  return (
+    <div className="space-y-6">
+      <p className="text-sm text-stone-600 leading-relaxed">
+        Concept: a small enclosed trailer built out as a mobile treatment room — climate-controlled,
+        with a massage table, soft lighting, and the Sol Solace wrap on the exterior. The case
+        depends entirely on one number: she's currently spending
+        <span className="font-medium text-ink"> {fmtUSD(currentOfficeRent)}/month </span>
+        on office space. A trailer eliminates that line item — or relocates it from "rent" to a
+        depreciating business asset she owns.
+      </p>
+
+      <div className="rounded-xl ring-soft p-5 bg-stone-50/40">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+          <Slider label="Trailer purchase" value={trailerCost} onChange={setTrailerCost}
+                  min={3000} max={35000} step={500} format={(v) => fmtUSD(v)}
+                  hint="Used 6×10 enclosed cargo ~$5k. New ~$8–12k. Larger custom ~$20k+." />
+          <Slider label="Build-out & finish" value={buildoutCost} onChange={setBuildoutCost}
+                  min={2000} max={25000} step={500} format={(v) => fmtUSD(v)}
+                  hint="Insulation, AC unit, electrical/battery, interior, massage table mount." />
+          <Slider label="Hitch install on Buzz" value={hitchInstall} onChange={setHitchInstall}
+                  min={300} max={1500} step={50} format={(v) => fmtUSD(v)}
+                  hint="One-time. ID Buzz tow capacity is ~2,700 lb." />
+          <Slider label="Monthly operating" value={monthlyOperating} onChange={setMonthlyOperating}
+                  min={25} max={400} step={25} format={(v) => fmtUSD(v) + '/mo'}
+                  hint="Insurance, registration, occasional maintenance, storage if needed." />
+          <Slider label="Current office rent" value={currentOfficeRent} onChange={setCurrentOfficeRent}
+                  min={1000} max={8000} step={100} format={(v) => fmtUSD(v) + '/mo'}
+                  hint={`${fmtUSD(currentOfficeRent * 12)}/yr today.`} />
+          <Slider label="Business use %" value={businessUsePct} onChange={setBusinessUsePct}
+                  min={0} max={100} step={5} format={(v) => v + '%'}
+                  hint="100% if used exclusively for client sessions." />
+        </div>
+      </div>
+
+      <div className="rounded-xl ring-soft overflow-hidden">
+        <table className="w-full text-sm">
+          <tbody>
+            <tr className="border-b border-stone-100">
+              <td className="px-4 sm:px-6 py-3 text-stone-700">Upfront investment</td>
+              <td className="px-4 sm:px-6 py-3 mono number-tabular text-right text-ink">{fmtUSD(upfront)}</td>
+            </tr>
+            <tr className="border-b border-stone-100">
+              <td className="px-4 sm:px-6 py-3 text-stone-600">
+                <div>Monthly cost (trailer)</div>
+                <div className="text-xs text-stone-400 mt-0.5">Operating only — payback period below</div>
+              </td>
+              <td className="px-4 sm:px-6 py-3 mono number-tabular text-right text-stone-700">{fmtUSD(monthlyOperating)}/mo</td>
+            </tr>
+            <tr className="border-b border-stone-100">
+              <td className="px-4 sm:px-6 py-3 text-stone-600">Current office rent</td>
+              <td className="px-4 sm:px-6 py-3 mono number-tabular text-right text-stone-700">{fmtUSD(currentOfficeRent)}/mo</td>
+            </tr>
+            <tr className="border-b border-stone-100">
+              <td className="px-4 sm:px-6 py-3 text-emerald-700 font-medium">Monthly savings</td>
+              <td className="px-4 sm:px-6 py-3 mono number-tabular text-right text-emerald-700 font-medium">{fmtUSD(monthlySavings)}/mo</td>
+            </tr>
+            {paybackMonths !== null && (
+              <tr className="border-b border-stone-100">
+                <td className="px-4 sm:px-6 py-3 text-stone-700">Payback period</td>
+                <td className="px-4 sm:px-6 py-3 mono number-tabular text-right text-ink">
+                  {paybackMonths < 12
+                    ? `${paybackMonths.toFixed(1)} months`
+                    : `${(paybackMonths / 12).toFixed(1)} years`}
+                </td>
+              </tr>
+            )}
+            <tr className="border-b border-stone-100">
+              <td className="px-4 sm:px-6 py-3 text-stone-600">
+                <div>Year-1 tax savings (Section 179)</div>
+                <div className="text-xs text-stone-400 mt-0.5">{fmtUSD(sec179Eligible)} × {taxRate}% — trailer is fully deductible as business property</div>
+              </td>
+              <td className="px-4 sm:px-6 py-3 mono number-tabular text-right text-emerald-700">+{fmtUSD(year1TaxSavings)}</td>
+            </tr>
+            <tr className="bg-emerald-50/40">
+              <td className="px-4 sm:px-6 py-4 text-ink font-medium">
+                <div>5-year net financial benefit</div>
+                <div className="text-xs text-stone-500 mt-0.5">Office rent eliminated − trailer total cost + year-1 tax savings</div>
+              </td>
+              <td className="px-4 sm:px-6 py-4 mono number-tabular text-right">
+                <span className="display text-xl sm:text-2xl text-emerald-700">{fmtUSD(fiveYearNetSavings)}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div className="border-t border-stone-100 pt-5">
+        <h4 className="text-ink font-medium mb-2">Buzz range impact when towing</h4>
+        <p className="text-sm text-stone-600 leading-relaxed">
+          ID Buzz tow capacity is ~2,700 lb. A typical built-out 6×10 enclosed trailer with
+          interior and AC runs 1,500–2,500 lb — within the limit but eating range hard.
+          <span className="text-ink"> EV range drops roughly 40–50% while towing</span> — so the
+          Buzz's 234 mi rating becomes ~120–140 mi when hauling the trailer. Fine for short
+          in-city moves between client sites; not fine for long highway runs. If she'd be moving
+          the trailer once and parking it for the day, this is a non-issue.
+        </p>
+      </div>
+
+      <div className="border-t border-stone-100 pt-5">
+        <h4 className="text-ink font-medium mb-2">Things to verify before committing</h4>
+        <ul className="space-y-1.5 text-sm text-stone-700">
+          <li className="flex gap-2"><span className="text-stone-400">·</span><span><span className="text-ink">Licensing</span> — does Texas massage licensing have facility requirements that exclude a mobile trailer?</span></li>
+          <li className="flex gap-2"><span className="text-stone-400">·</span><span><span className="text-ink">Zoning</span> — where can she legally park to see clients? Driveways, business lots, parks?</span></li>
+          <li className="flex gap-2"><span className="text-stone-400">·</span><span><span className="text-ink">Bathroom access</span> — clients need a bathroom. Plan around partner businesses, parks, or a client's home.</span></li>
+          <li className="flex gap-2"><span className="text-stone-400">·</span><span><span className="text-ink">Texas summer AC</span> — a small trailer in 100°+ heat needs a real cooling setup, not a portable unit. Budget more for build-out if you're going proper RV-spec.</span></li>
+          <li className="flex gap-2"><span className="text-stone-400">·</span><span><span className="text-ink">Commercial liability insurance</span> — separate from auto/trailer insurance. Treating clients in a trailer is a different policy than treating them in a leased studio.</span></li>
+          <li className="flex gap-2"><span className="text-stone-400">·</span><span><span className="text-ink">Client experience</span> — does mobile elevate or diminish the brand? For some clientele it's a feature (concierge wellness); for others it's a downgrade.</span></li>
+        </ul>
+      </div>
+
+      <div className="border-t border-stone-100 pt-5 -mx-5 sm:-mx-8 px-5 sm:px-8 pb-5 bg-emerald-50/30">
+        <h4 className="text-ink font-medium mb-2">The blunt take</h4>
+        <p className="text-sm text-stone-700 leading-relaxed">
+          The cash math on this is dramatic. Replacing {fmtUSD(currentOfficeRent * 12)}/yr of office
+          rent with a depreciating asset that costs roughly {fmtUSD(upfront)} upfront and {fmtUSD(monthlyOperating)}/mo
+          to run is one of the biggest leverage moves in this whole analysis — bigger than the
+          choice between Tesla and Buzz, probably. The number worth chasing isn't whether you
+          can save $5k on a vehicle; it's whether the wellness business can structurally operate
+          from a mobile asset. If the answer is yes, this dominates everything else on the page.
+        </p>
+        <p className="text-sm text-stone-700 leading-relaxed mt-3">
+          That said: the model assumes she actually can replace the office, which is a real-world
+          question of clientele, licensing, and practicality — not just spreadsheets. Worth a
+          serious conversation with her about whether this matches the experience she wants to
+          deliver, and a check-in with the relevant Texas licensing board before any trailer
+          purchase.
+        </p>
+      </div>
+
+      <p className="text-xs text-stone-500 leading-relaxed">
+        Note: office rent is already a deductible business expense today, so the tax-savings line
+        above counts only the year-1 Section 179 on the trailer itself (the new piece of math).
+        Operating cost deductibility is similar before and after. Confirm with your accountant.
+      </p>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // SOL SOLACE WRAP MOCKUPS (collapsible)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1460,6 +1634,11 @@ function App() {
         <Collapsible eyebrow="Sol Solace wrap · concepts" title="What a wrapped Buzz could look like" defaultOpen
                      summary="Two AI-generated palette directions on the ID Buzz silhouette.">
           <WrapMockups />
+        </Collapsible>
+
+        <Collapsible eyebrow="Mobile treatment trailer" title="Replacing $50k/yr of office rent with a $20–25k asset" defaultOpen
+                     summary="A trailer built out as a mobile treatment room — possibly the largest single leverage move in this whole analysis.">
+          <MobileTrailerAnalysis />
         </Collapsible>
 
         <Collapsible eyebrow="ID Buzz · pick a trim" title="Pro S vs. Pro S Plus vs. 1st Edition"
